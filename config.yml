@@ -1,0 +1,33 @@
+listener:
+  slotName: slot_1
+  dumpPath: 
+  dumpSnapshot: true
+  ackTimeout: 10s
+  refreshConnection: 30s
+  heartbeatInterval: 10s
+
+logger:
+  caller: false
+  level: info
+  humanReadable: true
+
+database:
+  host: 81.90.180.219
+  port: 5432
+  name: scum_db
+  user: pglogrepl
+  debug: false
+  password: secret
+  filter:
+    tables:
+      table_name:
+        - insert
+        - update
+        - delete
+
+publisher:
+  type: nats
+  address: localhost:4222
+  clusterID: test-cluster
+  clientID: wal-listener
+  topicPrefix: "pre"
