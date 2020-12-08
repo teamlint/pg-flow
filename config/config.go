@@ -17,8 +17,9 @@ type Config struct {
 // ListenerCfg path of the listener config.
 type ListenerCfg struct {
 	SlotName          string        `valid:"required"`
+	PubName           string        // 发布名称
 	DumpPath          string        // pg_dump 路径
-	DumpSnapshot      bool          `valid:"required"` // 是否导出复制槽快照数据
+	DumpSnapshot      bool          // 是否导出复制槽快照数据
 	AckTimeout        time.Duration `valid:"required"`
 	RefreshConnection time.Duration `valid:"required"`
 	HeartbeatInterval time.Duration `valid:"required"`

@@ -16,6 +16,9 @@ import (
 	"github.com/teamlint/pg-flow/config"
 	"github.com/teamlint/pg-flow/dump"
 	"github.com/teamlint/pg-flow/event"
+	"github.com/teamlint/pg-flow/replicator"
+	"github.com/teamlint/pg-flow/repository"
+	"github.com/teamlint/pg-flow/wal"
 )
 
 const errorBufferSize = 100
@@ -31,49 +34,28 @@ const (
 	StopServiceMessage  = "service was stopped"
 )
 
-type parser interface {
-	ParseWalMessage([]byte, *WalTransaction) error
-}
-
-type replication interface {
-	CreateReplicationSlotEx(slotName, outputPlugin string) (consistentPoint string, snapshotName string, err error)
-	DropReplicationSlot(slotName string) (err error)
-	StartReplication(slotName string, startLsn uint64, timeline int64, pluginArguments ...string) (err error)
-	WaitForReplicationMessage(ctx context.Context) (*pgx.ReplicationMessage, error)
-	SendStandbyStatus(k *pgx.StandbyStatus) (err error)
-	IsAlive() bool
-	Close() error
-}
-
-type repository interface {
-	GetSlotLSN(slotName string) (string, error)
-	IsAlive() bool
-	Close() error
-}
-
 // Listener main service struct.
 type Listener struct {
 	mu         sync.RWMutex
 	config     config.Config
 	slotName   string
 	publisher  event.Publisher
-	replicator replication
-	repository repository
-	parser     parser
+	replicator replicator.Replicator
+	repository repository.Repository
+	parser     wal.Parser
 	lsn        uint64
 	errChannel chan error
 }
 
-// NewWalListener create and initialize new service instance.
-func NewWalListener(
+// New create and initialize new listener service instance.
+func New(
 	cfg *config.Config,
-	repo repository,
-	repl replication,
+	repo repository.Repository,
+	repl replicator.Replicator,
 	publ event.Publisher,
-	parser parser,
+	parser wal.Parser,
 ) *Listener {
 	return &Listener{
-		// TODO
 		slotName:   fmt.Sprintf("%s_%s", cfg.Listener.SlotName, cfg.Database.Name),
 		config:     *cfg,
 		publisher:  publ,
@@ -93,7 +75,7 @@ func (l *Listener) readLSN() uint64 {
 func (l *Listener) setLSN(lsn uint64) {
 	l.mu.Lock()
 	l.lsn = lsn
-	defer l.mu.Unlock()
+	l.mu.Unlock()
 }
 
 // Process is main service entry point.
@@ -104,13 +86,30 @@ func (l *Listener) Process() error {
 	defer cancelFunc()
 	logrus.WithField("logger_level", l.config.Logger.Level).Infoln(StartServiceMessage)
 
+	// 发布检查
+	pubExists, err := l.publicationIsExists()
+	if err != nil {
+		logger.WithError(err).Errorln("publicationIsExists() error")
+		return err
+	}
+	if !pubExists {
+		if err := l.repository.CreatePublication(l.getPublicationName()); err != nil {
+			logger.WithError(err).Infoln("CreatePublication() error")
+			return err
+		}
+		logger.Infof("create new publication[%s]\n", l.getPublicationName())
+	} else {
+		logger.Infof("publication[%s] already exists\n", l.getPublicationName())
+	}
+	// 复制槽检查
 	slotIsExists, err := l.slotIsExists()
 	if err != nil {
 		logger.WithError(err).Errorln("slotIsExists() error")
 		return err
 	}
-
 	if !slotIsExists {
+		// consistentPoint: 复制槽开始流的最早位置
+		// snapshotID: 复制槽名称
 		consistentPoint, snapshotID, err := l.replicator.CreateReplicationSlotEx(l.slotName, pgOutputPlugin)
 		if err != nil {
 			logger.WithError(err).Infoln("CreateReplicationSlotEx() error")
@@ -123,12 +122,12 @@ func (l *Listener) Process() error {
 		}
 		l.setLSN(lsn)
 		logger.Infof("create new slot[%s], snapshot[%s]\n", l.slotName, snapshotID)
-		// dump
+		// dump 同步旧数据
 		if l.config.Listener.DumpSnapshot {
 			l.exportSnapshot(snapshotID)
 		}
 	} else {
-		logger.Infoln("slot already exists, LSN updated")
+		logger.Infof("slot[%s] already exists, LSN updated\n", l.slotName)
 	}
 
 	go l.Stream(ctx)
@@ -141,11 +140,11 @@ ProcessLoop:
 		select {
 		case <-refresh.C:
 			if !l.replicator.IsAlive() {
-				logrus.Fatalln(errReplConnectionIsLost)
+				logrus.Fatalln(ErrReplConnectionIsLost)
 			}
 			if !l.repository.IsAlive() {
-				logrus.Fatalln(errConnectionIsLost)
-				l.errChannel <- errConnectionIsLost
+				logrus.Fatalln(ErrConnectionIsLost)
+				l.errChannel <- ErrConnectionIsLost
 			}
 		case err := <-l.errChannel:
 			if errors.As(err, &serviceErr) {
@@ -189,6 +188,20 @@ func (l *Listener) slotIsExists() (bool, error) {
 	return true, nil
 }
 
+// getPublicationName 获取发布名称
+func (l *Listener) getPublicationName() string {
+	pubName := l.config.Listener.PubName
+	if pubName == "" {
+		pubName = "pgflow"
+	}
+	return pubName
+}
+
+// publicationIsExists 检查发布是否存在
+func (l *Listener) publicationIsExists() (bool, error) {
+	return l.repository.PublicationIsExists(l.getPublicationName())
+}
+
 func publicationNames(publication string) string {
 	return fmt.Sprintf(`publication_names '%s'`, publication)
 }
@@ -198,14 +211,14 @@ const protoVersion = "proto_version '1'"
 // Stream receive event from PostgreSQL.
 // Accept message, apply filter and  publish it in NATS server.
 func (l *Listener) Stream(ctx context.Context) {
-	err := l.replicator.StartReplication(l.slotName, l.readLSN(), -1, protoVersion, publicationNames("sport"))
+	err := l.replicator.StartReplication(l.slotName, l.readLSN(), -1, protoVersion, publicationNames(l.getPublicationName()))
 	if err != nil {
 		l.errChannel <- newListenerError("StartReplication()", err)
 		return
 	}
 
 	go l.SendPeriodicHeartbeats(ctx)
-	tx := NewWalTransaction()
+	tx := wal.NewTransaction()
 	for {
 		if ctx.Err() != nil {
 			l.errChannel <- newListenerError("read msg", err)
@@ -221,7 +234,7 @@ func (l *Listener) Stream(ctx context.Context) {
 			if msg.WalMessage != nil {
 				logrus.WithField("wal", msg.WalMessage.WalStart).
 					Debugln("receive wal message")
-				err := l.parser.ParseWalMessage(msg.WalMessage.WalData, tx)
+				err := l.parser.ParseMessage(msg.WalMessage.WalData, tx)
 				if err != nil {
 					logrus.WithError(err).Errorln("msg parse failed")
 					l.errChannel <- fmt.Errorf("%v: %w", ErrUnmarshalMsg, err)

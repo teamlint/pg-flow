@@ -1,4 +1,4 @@
-package listener
+package wal
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 )
 
 // BinaryParser represent binary protocol parser.
+// WAL 二进制解析器
 type BinaryParser struct {
 	byteOrder binary.ByteOrder
 	msgType   byte
@@ -23,10 +24,11 @@ func NewBinaryParser(byteOrder binary.ByteOrder) *BinaryParser {
 	}
 }
 
-// ParseWalMessage parse postgres WAL message.
-func (p *BinaryParser) ParseWalMessage(msg []byte, tx *WalTransaction) error {
+// ParseMessage parse postgres WAL message.
+// 解析 WAL 消息
+func (p *BinaryParser) ParseMessage(msg []byte, tx *Transaction) error {
 	if len(msg) == 0 {
-		return errEmptyWALMessage
+		return ErrEmptyMessage
 	}
 	p.msgType = msg[0]
 	p.buffer = bytes.NewBuffer(msg[1:])
@@ -52,7 +54,7 @@ func (p *BinaryParser) ParseWalMessage(msg []byte, tx *WalTransaction) error {
 				}).
 			Infoln("receive commit message")
 		if tx.LSN > 0 && tx.LSN != commit.LSN {
-			return fmt.Errorf("commit: %w", errMessageLost)
+			return fmt.Errorf("commit: %w", ErrMessageLost)
 		}
 		tx.CommitTime = &commit.Timestamp
 	case OriginMsgType:
@@ -67,7 +69,7 @@ func (p *BinaryParser) ParseWalMessage(msg []byte, tx *WalTransaction) error {
 				}).
 			Infoln("receive relation message")
 		if tx.LSN == 0 {
-			return fmt.Errorf("commit: %w", errMessageLost)
+			return fmt.Errorf("commit: %w", ErrMessageLost)
 		}
 		rd := RelationData{
 			Schema: relation.Namespace,
@@ -137,7 +139,7 @@ func (p *BinaryParser) ParseWalMessage(msg []byte, tx *WalTransaction) error {
 		}
 		tx.Actions = append(tx.Actions, action)
 	default:
-		return fmt.Errorf("%w : %s", errUnknownMessageType, []byte{p.msgType})
+		return fmt.Errorf("%w : %s", ErrUnknownMessageType, []byte{p.msgType})
 	}
 	return nil
 }
@@ -225,7 +227,7 @@ func (p *BinaryParser) readInt16() (val int16) {
 
 func (p *BinaryParser) readTimestamp() time.Time {
 	ns := p.readInt64()
-	return postgresEpoch.Add(time.Duration(ns) * time.Microsecond)
+	return postgresEpoch.Add(time.Duration(ns) * time.Microsecond).Local()
 }
 
 func (p *BinaryParser) readString() (str string) {

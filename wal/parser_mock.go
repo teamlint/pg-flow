@@ -1,4 +1,4 @@
-package listener
+package wal
 
 import (
 	"time"
@@ -10,7 +10,7 @@ type parserMock struct {
 	mock.Mock
 }
 
-func (p *parserMock) ParseWalMessage(msg []byte, tx *WalTransaction) error {
+func (p *parserMock) ParseMessage(msg []byte, tx *Transaction) error {
 	args := p.Called(msg, tx)
 	now := time.Now()
 	tx.BeginTime = &now

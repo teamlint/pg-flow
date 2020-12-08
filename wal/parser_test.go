@@ -1,4 +1,4 @@
-package listener
+package wal
 
 import (
 	"bytes"
@@ -832,7 +832,7 @@ func TestBinaryParser_ParseWalMessage(t *testing.T) {
 			p := &BinaryParser{
 				byteOrder: binary.BigEndian,
 			}
-			if err := p.ParseWalMessage(tt.args.msg, tt.args.tx); (err != nil) != tt.wantErr {
+			if err := p.ParseMessage(tt.args.msg, tt.args.tx); (err != nil) != tt.wantErr {
 				t.Errorf("ParseWalMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			assert.Equal(t, tt.want, tt.args.tx)

@@ -1,4 +1,4 @@
-package listener
+package repository
 
 import "github.com/stretchr/testify/mock"
 

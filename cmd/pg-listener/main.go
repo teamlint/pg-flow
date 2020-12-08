@@ -13,6 +13,8 @@ import (
 	"github.com/teamlint/pg-flow/event"
 	"github.com/teamlint/pg-flow/event/publisher/nats"
 	"github.com/teamlint/pg-flow/listener"
+	"github.com/teamlint/pg-flow/repository"
+	"github.com/teamlint/pg-flow/wal"
 )
 
 // go build -ldflags "-X main.version=1.0.1" main.go
@@ -47,7 +49,7 @@ func main() {
 			if err != nil {
 				logrus.Fatal(err)
 			}
-			repo := listener.NewRepository(conn)
+			repo := repository.New(conn)
 			// publisher
 			nats.Register(cfg)
 			publisher, err := event.GetPublisher(cfg.Publisher.Type)
@@ -55,9 +57,9 @@ func main() {
 				logrus.Fatal(err)
 			}
 			// wal parser
-			parser := listener.NewBinaryParser(binary.BigEndian)
+			parser := wal.NewBinaryParser(binary.BigEndian)
 			// listener
-			service := listener.NewWalListener(cfg, repo, rConn, publisher, parser)
+			service := listener.New(cfg, repo, rConn, publisher, parser)
 			return service.Process()
 		},
 	}

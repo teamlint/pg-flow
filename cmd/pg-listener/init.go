@@ -43,7 +43,6 @@ func initLogger(cfg config.LoggerCfg) {
 // initPgxConnections initialise db and replication connections.
 func initPgxConnections(cfg config.DatabaseCfg) (*pgx.Conn, *pgx.ReplicationConn, error) {
 	pgxConf := pgx.ConnConfig{
-		// TODO logger
 		LogLevel: pgx.LogLevelInfo,
 		Logger:   pgxLogger{},
 		Host:     cfg.Host,

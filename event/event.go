@@ -16,12 +16,12 @@ var (
 // Event event structure for publishing to the NATS server.
 //easyjson:json
 type Event struct {
-	ID        uuid.UUID              `json:"id"`
-	Schema    string                 `json:"schema"`
-	Table     string                 `json:"table"`
-	Action    string                 `json:"action"`
-	Data      map[string]interface{} `json:"data"`
-	EventTime time.Time              `json:"commitTime"`
+	ID         uuid.UUID              `json:"id"`
+	Schema     string                 `json:"schema"`
+	Table      string                 `json:"table"`
+	Action     string                 `json:"action"`
+	Data       map[string]interface{} `json:"data"`
+	CommitTime time.Time              `json:"commit_time"`
 }
 
 // GetSubject creates subject name from the prefix, schema and table name.

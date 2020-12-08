@@ -1,5 +1,6 @@
 listener:
   slotName: slot_1
+  pubName: 
   dumpPath: 
   dumpSnapshot: true
   ackTimeout: 10s

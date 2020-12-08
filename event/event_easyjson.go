@@ -4,7 +4,6 @@ package event
 
 import (
 	json "encoding/json"
-
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
@@ -18,7 +17,7 @@ var (
 	_ easyjson.Marshaler
 )
 
-func easyjsonAd513449DecodeGithubComIhippikWalListenerListener(in *jlexer.Lexer, out *Event) {
+func easyjsonF642ad3eDecodeGithubComTeamlintPgFlowEvent(in *jlexer.Lexer, out *Event) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -29,7 +28,7 @@ func easyjsonAd513449DecodeGithubComIhippikWalListenerListener(in *jlexer.Lexer,
 	}
 	in.Delim('{')
 	for !in.IsDelim('}') {
-		key := in.UnsafeString()
+		key := in.UnsafeFieldName(false)
 		in.WantColon()
 		if in.IsNull() {
 			in.Skip()
@@ -52,11 +51,7 @@ func easyjsonAd513449DecodeGithubComIhippikWalListenerListener(in *jlexer.Lexer,
 				in.Skip()
 			} else {
 				in.Delim('{')
-				if !in.IsDelim('}') {
-					out.Data = make(map[string]interface{})
-				} else {
-					out.Data = nil
-				}
+				out.Data = make(map[string]interface{})
 				for !in.IsDelim('}') {
 					key := string(in.String())
 					in.WantColon()
@@ -73,9 +68,9 @@ func easyjsonAd513449DecodeGithubComIhippikWalListenerListener(in *jlexer.Lexer,
 				}
 				in.Delim('}')
 			}
-		case "commitTime":
+		case "commit_time":
 			if data := in.Raw(); in.Ok() {
-				in.AddError((out.EventTime).UnmarshalJSON(data))
+				in.AddError((out.CommitTime).UnmarshalJSON(data))
 			}
 		default:
 			in.SkipRecursive()
@@ -87,7 +82,7 @@ func easyjsonAd513449DecodeGithubComIhippikWalListenerListener(in *jlexer.Lexer,
 		in.Consumed()
 	}
 }
-func easyjsonAd513449EncodeGithubComIhippikWalListenerListener(out *jwriter.Writer, in Event) {
+func easyjsonF642ad3eEncodeGithubComTeamlintPgFlowEvent(out *jwriter.Writer, in Event) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -139,9 +134,9 @@ func easyjsonAd513449EncodeGithubComIhippikWalListenerListener(out *jwriter.Writ
 		}
 	}
 	{
-		const prefix string = ",\"commitTime\":"
+		const prefix string = ",\"commit_time\":"
 		out.RawString(prefix)
-		out.Raw((in.EventTime).MarshalJSON())
+		out.Raw((in.CommitTime).MarshalJSON())
 	}
 	out.RawByte('}')
 }
@@ -149,23 +144,23 @@ func easyjsonAd513449EncodeGithubComIhippikWalListenerListener(out *jwriter.Writ
 // MarshalJSON supports json.Marshaler interface
 func (v Event) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonAd513449EncodeGithubComIhippikWalListenerListener(&w, v)
+	easyjsonF642ad3eEncodeGithubComTeamlintPgFlowEvent(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Event) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonAd513449EncodeGithubComIhippikWalListenerListener(w, v)
+	easyjsonF642ad3eEncodeGithubComTeamlintPgFlowEvent(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *Event) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonAd513449DecodeGithubComIhippikWalListenerListener(&r, v)
+	easyjsonF642ad3eDecodeGithubComTeamlintPgFlowEvent(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Event) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonAd513449DecodeGithubComIhippikWalListenerListener(l, v)
+	easyjsonF642ad3eDecodeGithubComTeamlintPgFlowEvent(l, v)
 }

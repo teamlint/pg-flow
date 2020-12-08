@@ -1,4 +1,4 @@
-package listener
+package wal
 
 import (
 	"reflect"
@@ -9,7 +9,7 @@ import (
 	"github.com/magiconair/properties/assert"
 )
 
-func TestWalTransaction_CreateActionData(t *testing.T) {
+func TestTransaction_CreateActionData(t *testing.T) {
 	type fields struct {
 		LSN           int64
 		BeginTime     *time.Time

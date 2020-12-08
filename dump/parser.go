@@ -97,12 +97,12 @@ func (p *parser) parseSQL(line string) *event.Event {
 				}
 			}
 			evt := event.Event{
-				ID:        uuid.New(),
-				Schema:    row.Table.Qualifier.String(),
-				Table:     row.Table.Name.String(),
-				Action:    ActionKindInsert,
-				Data:      data,
-				EventTime: time.Now(),
+				ID:         uuid.New(),
+				Schema:     row.Table.Qualifier.String(),
+				Table:      row.Table.Name.String(),
+				Action:     ActionKindInsert,
+				Data:       data,
+				CommitTime: time.Now(),
 			}
 			logrus.WithField("ID", evt.ID).
 				WithField("schema", evt.Schema).

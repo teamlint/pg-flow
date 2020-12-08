@@ -1,4 +1,4 @@
-package listener
+package wal
 
 import (
 	"errors"
@@ -22,8 +22,8 @@ const (
 	ActionKindDelete ActionKind = "DELETE"
 )
 
-// WalTransaction transaction specified WAL message.
-type WalTransaction struct {
+// Transaction transaction specified WAL message.
+type Transaction struct {
 	LSN           int64
 	BeginTime     *time.Time
 	CommitTime    *time.Time
@@ -31,9 +31,9 @@ type WalTransaction struct {
 	Actions       []ActionData
 }
 
-// NewWalTransaction create and initialize new WAL transaction.
-func NewWalTransaction() *WalTransaction {
-	return &WalTransaction{
+// NewTransaction create and initialize new WAL transaction.
+func NewTransaction() *Transaction {
+	return &Transaction{
 		RelationStore: make(map[int32]RelationData),
 	}
 }
@@ -79,23 +79,24 @@ func (c *Column) AssertValue(src []byte) {
 		val = strSrc
 	case pgtype.TimestampOID, pgtype.TimestamptzOID:
 		val = strSrc
+	case pgtype.VarcharOID:
+		val = strSrc
 	default:
-		logrus.WithField("pgtype", c.valueType).
-			Warnln("unknown oid type")
+		logrus.WithField("pgtype", c.valueType).Warnln("unknown oid type")
 		val = strSrc
 	}
 	c.value = val
 }
 
 // Clear transaction data.
-func (w *WalTransaction) Clear() {
+func (w *Transaction) Clear() {
 	w.CommitTime = nil
 	w.BeginTime = nil
 	w.Actions = nil
 }
 
 // CreateActionData create action  from WAL message data.
-func (w WalTransaction) CreateActionData(
+func (w Transaction) CreateActionData(
 	relationID int32,
 	rows []TupleData,
 	kind ActionKind,
@@ -126,7 +127,7 @@ func (w WalTransaction) CreateActionData(
 
 // CreateEventsWithFilter filter WAL message by table,
 // action and create events for each value.
-func (w *WalTransaction) CreateEventsWithFilter(tableMap map[string][]string) []event.Event {
+func (w *Transaction) CreateEventsWithFilter(tableMap map[string][]string) []event.Event {
 	var events []event.Event
 
 	for _, item := range w.Actions {
@@ -135,12 +136,12 @@ func (w *WalTransaction) CreateEventsWithFilter(tableMap map[string][]string) []
 			data[val.name] = val.value
 		}
 		evt := event.Event{
-			ID:        uuid.New(),
-			Schema:    item.Schema,
-			Table:     item.Table,
-			Action:    item.Kind.string(),
-			Data:      data,
-			EventTime: *w.CommitTime,
+			ID:         uuid.New(),
+			Schema:     item.Schema,
+			Table:      item.Table,
+			Action:     item.Kind.string(),
+			Data:       data,
+			CommitTime: *w.CommitTime,
 		}
 
 		actions, validTable := tableMap[item.Table]
