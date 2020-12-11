@@ -26,7 +26,7 @@ func (n NatsPublisher) Close() error {
 }
 
 // Publish serializes the event and publishes it on the bus.
-func (n NatsPublisher) Publish(subject string, evt event.Event) error {
+func (n NatsPublisher) Publish(subject string, evt *event.Event) error {
 	msg, err := evt.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal err: %w", err)
@@ -44,7 +44,7 @@ func Register(cfg *config.Config) {
 	// nats publisher
 	sc, err := stan.Connect(cfg.Publisher.ClusterID, cfg.Publisher.ClientID, stan.NatsURL(cfg.Publisher.Address))
 	if err != nil {
-		logrus.WithError(err).Fatalln(ErrNatsConnection)
+		logrus.WithError(err).WithField("publisher.Register", "nats").Fatalln(ErrNatsConnection)
 	}
 
 	event.RegisterPublisher("nats", New(sc))

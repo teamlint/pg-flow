@@ -127,8 +127,8 @@ func (w Transaction) CreateActionData(
 
 // CreateEventsWithFilter filter WAL message by table,
 // action and create events for each value.
-func (w *Transaction) CreateEventsWithFilter(tableMap map[string][]string) []event.Event {
-	var events []event.Event
+func (w *Transaction) CreateEventsWithFilter(tableMap map[string][]string) []*event.Event {
+	var events []*event.Event
 
 	for _, item := range w.Actions {
 		data := make(map[string]interface{})
@@ -147,7 +147,7 @@ func (w *Transaction) CreateEventsWithFilter(tableMap map[string][]string) []eve
 		actions, validTable := tableMap[item.Table]
 		validAction := inArray(actions, item.Kind.string())
 		if validTable && validAction {
-			events = append(events, evt)
+			events = append(events, &evt)
 		} else {
 			logrus.WithFields(
 				logrus.Fields{

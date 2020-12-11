@@ -1,19 +1,3 @@
-/*
- * Copyright 2018 Shanghai Junzheng Network Technology Co.,Ltd.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *	   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 // This code was derived from https://github.com/hellobike/amazonriver
 
 package dump
@@ -26,7 +10,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/teamlint/pg-flow/config"
-	"github.com/teamlint/pg-flow/event"
+	"github.com/teamlint/pg-flow/dump/handler"
+	"github.com/teamlint/pg-flow/dump/handler/esbulk"
+	"github.com/teamlint/pg-flow/dump/handler/event"
 )
 
 const (
@@ -35,13 +21,14 @@ const (
 
 // Dumper dump database
 type Dumper struct {
-	pgDump string
-	conf   *config.Config
+	pgDump  string
+	handler handler.Handler
+	conf    *config.Config
 }
 
 // New create a Dumper
 func New(conf *config.Config) *Dumper {
-	pgDump := conf.Listener.DumpPath
+	pgDump := conf.Dumper.Path
 	if pgDump == "" {
 		pgDump = "pg_dump"
 	}
@@ -50,7 +37,7 @@ func New(conf *config.Config) *Dumper {
 }
 
 // Dump database with snapshot, parse sql then write to handler
-func (d *Dumper) Dump(snapshotID string, pub event.Publisher) error {
+func (d *Dumper) Dump(snapshotID string) error {
 	args := make([]string, 0, 16)
 
 	// Common args
@@ -82,15 +69,25 @@ func (d *Dumper) Dump(snapshotID string, pub event.Publisher) error {
 	cmd.Stderr = os.Stderr
 
 	errCh := make(chan error)
-	parser := newParser(r)
+
+	// sql parser
+	sqlParser := newSQLParser(r)
+	// handler
+	event.Register(d.conf)
+	esbulk.Register(d.conf)
+	hdr, err := handler.GetHandler(d.conf.Dumper.Handler)
+	if err != nil {
+		logrus.WithError(err).WithField("dumper.handler", d.conf.Dumper.Handler).Fatalln("handler.GetHandler")
+	}
+	logrus.WithField("dumper.handler", d.conf.Dumper.Handler).Infoln("handler.GetHandler")
 	go func() {
-		err := parser.parse(pub, d.conf.Publisher.TopicPrefix)
+		err := sqlParser.Parse(hdr)
 		errCh <- err
 	}()
 
 	logrus.Infof("pg_dump %s\n", cmd.Args)
 
-	err := cmd.Run()
+	err = cmd.Run()
 	w.CloseWithError(err)
 
 	err = <-errCh

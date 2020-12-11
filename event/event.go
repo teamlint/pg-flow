@@ -36,56 +36,11 @@ func GetPublisher(name string) (Publisher, error) {
 	return nil, ErrPublisherNotFound
 }
 func RegisterPublisher(name string, pub Publisher) {
-	publishers[name] = pub
-
+	if _, ok := publishers[name]; !ok {
+		publishers[name] = pub
+	}
 }
+
 func init() {
 	publishers = make(map[string]Publisher)
 }
-
-// func NewEvent(tableMap map[string][]string) []event.Event {
-// CreateEventsWithFilter filter WAL message by table,
-// action and create events for each value.
-// func NewEventsWithFilter(tableMap map[string][]string) []event.Event {
-// 	var events []event.Event
-
-// 	for _, item := range w.Actions {
-// 		data := make(map[string]interface{})
-// 		for _, val := range item.Columns {
-// 			data[val.name] = val.value
-// 		}
-// 		evt := event.Event{
-// 			ID:        uuid.New(),
-// 			Schema:    item.Schema,
-// 			Table:     item.Table,
-// 			Action:    item.Kind.string(),
-// 			Data:      data,
-// 			EventTime: *w.CommitTime,
-// 		}
-
-// 		actions, validTable := tableMap[item.Table]
-// 		validAction := inArray(actions, item.Kind.string())
-// 		if validTable && validAction {
-// 			events = append(events, evt)
-// 		} else {
-// 			logrus.WithFields(
-// 				logrus.Fields{
-// 					"schema": item.Schema,
-// 					"table":  item.Table,
-// 					"action": item.Kind,
-// 				}).
-// 				Infoln("wal message skip by filter")
-// 		}
-// 	}
-// 	return events
-// }
-
-// // inArray checks whether the value is in an array.
-// func inArray(arr []string, value string) bool {
-// 	for _, v := range arr {
-// 		if strings.EqualFold(v, value) {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }

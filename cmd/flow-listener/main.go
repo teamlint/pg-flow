@@ -22,7 +22,7 @@ var version = "0.0.1"
 
 func main() {
 	app := &cli.App{
-		Name:    "Wal-Listener",
+		Name:    "flow-Listener",
 		Usage:   "listen postgres events",
 		Version: version,
 		Flags: []cli.Flag{
@@ -59,8 +59,8 @@ func main() {
 			// wal parser
 			parser := wal.NewBinaryParser(binary.BigEndian)
 			// listener
-			service := listener.New(cfg, repo, rConn, publisher, parser)
-			return service.Process()
+			l := listener.New(cfg, repo, rConn, publisher, parser)
+			return l.Process()
 		},
 	}
 	err := app.Run(os.Args)

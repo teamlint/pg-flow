@@ -123,7 +123,7 @@ func (l *Listener) Process() error {
 		l.setLSN(lsn)
 		logger.Infof("create new slot[%s], snapshot[%s]\n", l.slotName, snapshotID)
 		// dump 同步旧数据
-		if l.config.Listener.DumpSnapshot {
+		if l.config.Listener.Dump {
 			l.exportSnapshot(snapshotID)
 		}
 	} else {
@@ -354,9 +354,9 @@ func (l *Listener) AckWalMessage(lsn uint64) error {
 // exportSnapshot 导出快照数据
 func (l *Listener) exportSnapshot(snapshotID string) error {
 	// replication slot already exists
-	if snapshotID == "" || !l.config.Listener.DumpSnapshot {
+	if snapshotID == "" || !l.config.Listener.Dump {
 		return nil
 	}
 	dumper := dump.New(&l.config)
-	return dumper.Dump(snapshotID, l.publisher)
+	return dumper.Dump(snapshotID)
 }

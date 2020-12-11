@@ -35,23 +35,21 @@ func (p *BinaryParser) ParseMessage(msg []byte, tx *Transaction) error {
 	switch p.msgType {
 	case BeginMsgType:
 		begin := p.getBeginMsg()
-		logrus.
-			WithFields(
-				logrus.Fields{
-					"lsn": begin.LSN,
-					"xid": begin.XID,
-				}).
+		logrus.WithFields(
+			logrus.Fields{
+				"lsn": begin.LSN,
+				"xid": begin.XID,
+			}).
 			Infoln("receive begin message")
 		tx.LSN = begin.LSN
 		tx.BeginTime = &begin.Timestamp
 	case CommitMsgType:
 		commit := p.getCommitMsg()
-		logrus.
-			WithFields(
-				logrus.Fields{
-					"lsn":             commit.LSN,
-					"transaction_lsn": commit.TransactionLSN,
-				}).
+		logrus.WithFields(
+			logrus.Fields{
+				"lsn":             commit.LSN,
+				"transaction_lsn": commit.TransactionLSN,
+			}).
 			Infoln("receive commit message")
 		if tx.LSN > 0 && tx.LSN != commit.LSN {
 			return fmt.Errorf("commit: %w", ErrMessageLost)
@@ -61,12 +59,11 @@ func (p *BinaryParser) ParseMessage(msg []byte, tx *Transaction) error {
 		logrus.Infoln("receive origin message")
 	case RelationMsgType:
 		relation := p.getRelationMsg()
-		logrus.
-			WithFields(
-				logrus.Fields{
-					"relation_id": relation.ID,
-					"replica":     relation.Replica,
-				}).
+		logrus.WithFields(
+			logrus.Fields{
+				"relation_id": relation.ID,
+				"replica":     relation.Replica,
+			}).
 			Infoln("receive relation message")
 		if tx.LSN == 0 {
 			return fmt.Errorf("commit: %w", ErrMessageLost)
@@ -89,11 +86,10 @@ func (p *BinaryParser) ParseMessage(msg []byte, tx *Transaction) error {
 		logrus.Infoln("type")
 	case InsertMsgType:
 		insert := p.getInsertMsg()
-		logrus.
-			WithFields(
-				logrus.Fields{
-					"relation_id": insert.RelationID,
-				}).
+		logrus.WithFields(
+			logrus.Fields{
+				"relation_id": insert.RelationID,
+			}).
 			Infoln("receive insert message")
 		action, err := tx.CreateActionData(
 			insert.RelationID,
@@ -106,11 +102,10 @@ func (p *BinaryParser) ParseMessage(msg []byte, tx *Transaction) error {
 		tx.Actions = append(tx.Actions, action)
 	case UpdateMsgType:
 		upd := p.getUpdateMsg()
-		logrus.
-			WithFields(
-				logrus.Fields{
-					"relation_id": upd.RelationID,
-				}).
+		logrus.WithFields(
+			logrus.Fields{
+				"relation_id": upd.RelationID,
+			}).
 			Infoln("receive update message")
 		action, err := tx.CreateActionData(
 			upd.RelationID,
@@ -123,11 +118,10 @@ func (p *BinaryParser) ParseMessage(msg []byte, tx *Transaction) error {
 		tx.Actions = append(tx.Actions, action)
 	case DeleteMsgType:
 		del := p.getDeleteMsg()
-		logrus.
-			WithFields(
-				logrus.Fields{
-					"relation_id": del.RelationID,
-				}).
+		logrus.WithFields(
+			logrus.Fields{
+				"relation_id": del.RelationID,
+			}).
 			Infoln("receive delete message")
 		action, err := tx.CreateActionData(
 			del.RelationID,

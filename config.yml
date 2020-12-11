@@ -1,11 +1,14 @@
 listener:
   slotName: slot_1
+  dump: false
   pubName: 
-  dumpPath: 
-  dumpSnapshot: true
   ackTimeout: 10s
   refreshConnection: 30s
   heartbeatInterval: 10s
+
+dumper:
+  handler: 'esbulk' # defaults event, publisher is used. [event,sql,esbulk]
+  path: 
 
 logger:
   caller: false

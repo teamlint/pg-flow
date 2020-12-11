@@ -11,6 +11,7 @@ type Config struct {
 	Listener  ListenerCfg  // 数据库监控器配置
 	Database  DatabaseCfg  // 数据库连接配置
 	Publisher PublisherCfg // 事件发布器配置
+	Dumper    DumperCfg    // Dumper 配置
 	Logger    LoggerCfg    // 日志配置
 }
 
@@ -18,11 +19,15 @@ type Config struct {
 type ListenerCfg struct {
 	SlotName          string        `valid:"required"`
 	PubName           string        // 发布名称
-	DumpPath          string        // pg_dump 路径
-	DumpSnapshot      bool          // 是否导出复制槽快照数据
+	Dump              bool          // 是否导出复制槽快照数据
 	AckTimeout        time.Duration `valid:"required"`
 	RefreshConnection time.Duration `valid:"required"`
 	HeartbeatInterval time.Duration `valid:"required"`
+}
+
+type DumperCfg struct {
+	Handler string // Dump Handler: event,sql,es 默认event, 适合历史数据较少情况
+	Path    string // pg_dump 路径
 }
 
 // PublisherCfg path of the evernt publisher config.
