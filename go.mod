@@ -6,6 +6,7 @@ require (
 	bou.ke/monkey v1.0.2
 	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef
 	github.com/cockroachdb/apd v1.1.0 // indirect
+	github.com/elastic/go-elasticsearch/v7 v7.10.0
 	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/google/uuid v1.1.2
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
