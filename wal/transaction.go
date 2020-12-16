@@ -136,7 +136,7 @@ func (w *Transaction) CreateEventsWithFilter(tableMap map[string][]string) []*ev
 			data[val.name] = val.value
 		}
 		evt := event.Event{
-			ID:         uuid.New(),
+			ID:         uuid.New().String(),
 			Schema:     item.Schema,
 			Table:      item.Table,
 			Action:     item.Kind.string(),

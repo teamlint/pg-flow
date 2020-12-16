@@ -37,9 +37,7 @@ func easyjsonF642ad3eDecodeGithubComTeamlintPgFlowEvent(in *jlexer.Lexer, out *E
 		}
 		switch key {
 		case "id":
-			if data := in.UnsafeBytes(); in.Ok() {
-				in.AddError((out.ID).UnmarshalText(data))
-			}
+			out.ID = string(in.String())
 		case "schema":
 			out.Schema = string(in.String())
 		case "table":
@@ -89,7 +87,7 @@ func easyjsonF642ad3eEncodeGithubComTeamlintPgFlowEvent(out *jwriter.Writer, in 
 	{
 		const prefix string = ",\"id\":"
 		out.RawString(prefix[1:])
-		out.RawText((in.ID).MarshalText())
+		out.String(string(in.ID))
 	}
 	{
 		const prefix string = ",\"schema\":"

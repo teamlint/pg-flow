@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"time"
+)
 
-	"github.com/google/uuid"
+const (
+	OverID = "_OVER_" // 事件结束 ID
 )
 
 var (
@@ -16,7 +18,7 @@ var (
 // Event event structure for publishing to the NATS server.
 //easyjson:json
 type Event struct {
-	ID         uuid.UUID              `json:"id"`
+	ID         string                 `json:"id"`
 	Schema     string                 `json:"schema"`
 	Table      string                 `json:"table"`
 	Action     string                 `json:"action"`
@@ -27,6 +29,11 @@ type Event struct {
 // GetSubject creates subject name from the prefix, schema and table name.
 func (e Event) GetSubject(prefix string) string {
 	return fmt.Sprintf("%s_%s_%s", prefix, e.Schema, e.Table)
+}
+
+// IsOver 判断是否是结束事件
+func (e Event) IsOver() bool {
+	return e.ID == OverID
 }
 
 func GetPublisher(name string) (Publisher, error) {

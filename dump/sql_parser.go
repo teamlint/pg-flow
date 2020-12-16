@@ -4,6 +4,7 @@ package dump
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"strconv"
 	"strings"
@@ -17,9 +18,16 @@ import (
 	sp "github.com/xwb1989/sqlparser"
 )
 
+const (
+	// 标识 SQL 文件内容结束语句
+	DumpCompleteStatement = "-- PostgreSQL database dump complete\n"
+)
+
 // sqlParser pg_dump sql解析器
 type sqlParser struct {
-	r io.Reader
+	r   io.Reader
+	buf bytes.Buffer
+	n   int
 }
 
 func newSQLParser(r io.Reader) *sqlParser {
@@ -33,6 +41,15 @@ func (p *sqlParser) Parse(h handler.Handler) error {
 		line, err := rb.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
+				evt := event.Event{
+					ID:         event.OverID,
+					CommitTime: time.Now(),
+				}
+				logrus.WithField("id", evt.ID).Infoln("event is over")
+				if err = h.Handle(&evt); err != nil {
+					logrus.Debugf("event.over handle err = %v\n", err)
+					return err
+				}
 				break
 			}
 			return err
@@ -42,10 +59,9 @@ func (p *sqlParser) Parse(h handler.Handler) error {
 		if evt == nil {
 			continue
 		}
-		logrus.Debugf("sql.evt = %+v\n", evt)
-
+		// logrus.Debugf("sql.evt = %+v\n", evt)
 		if err := h.Handle(evt); err != nil {
-			logrus.Debugf("event handle err = %v\n", err)
+			logrus.WithError(err).Debugln("sqlParser.Parse")
 			return err
 		}
 
@@ -54,15 +70,13 @@ func (p *sqlParser) Parse(h handler.Handler) error {
 }
 
 // parseSQL 解析 SQL 语句为事件
-func (p *sqlParser) parseSQL(line string) *event.Event {
-	if !strings.HasPrefix(line, ActionKindInsert) {
-		return nil
-	}
-
-	line = strings.ReplaceAll(line, `"`, "")
-	stmt, err := sp.Parse(line)
+func (p *sqlParser) parseEvent() *event.Event {
+	s := strings.ReplaceAll(p.buf.String(), `"`, "")
+	logrus.Debugf("parseEvent.statement[%v] = %v\n", p.buf.Len(), s)
+	stmt, err := sp.Parse(s)
 	if err != nil {
-		logrus.Debugf("parseSQL.err = %v\n", err)
+		logrus.WithError(err).Warn("parseEvent")
+		p.buf.Reset()
 		return nil
 	}
 	switch row := stmt.(type) {
@@ -85,20 +99,67 @@ func (p *sqlParser) parseSQL(line string) *event.Event {
 				}
 			}
 			evt := event.Event{
-				ID:         uuid.New(),
+				ID:         uuid.New().String(),
 				Schema:     row.Table.Qualifier.String(),
 				Table:      row.Table.Name.String(),
 				Action:     ActionKindInsert,
 				Data:       data,
 				CommitTime: time.Now(),
 			}
+			p.buf.Reset()
 			logrus.WithField("ID", evt.ID).
 				WithField("schema", evt.Schema).
 				WithField("table", evt.Table).
 				WithField("action", evt.Action).
+				// WithField("data", evt.Data).
 				Infoln("event was send")
 			return &evt
 		}
+	}
+	return nil
+}
+
+// parseSQL 解析SQL语句
+func (p *sqlParser) parseSQL(line string) *event.Event {
+	// if !(strings.HasPrefix(line, ActionKindInsert) || strings.HasPrefix(line, "--")) {
+	if !strings.HasPrefix(line, ActionKindInsert) {
+		if p.buf.Len() > 0 {
+			// 文件结束
+			if line == DumpCompleteStatement {
+				logrus.WithField("dump.complete.statement", "end").Debugln(line)
+				return p.parseEvent()
+			}
+
+			_, err := p.buf.WriteString(line)
+			if err != nil {
+				logrus.WithError(err).WithField("statement", "add").Errorln(line)
+			}
+			return nil
+		}
+		return nil
+	}
+	// statement begin
+	if p.buf.Len() == 0 {
+		// 忽略注释语句
+		if strings.HasPrefix(line, "--") {
+			return nil
+		}
+		// INSERT 语句开始
+		if strings.HasPrefix(line, ActionKindInsert) {
+			p.statementAdd(line)
+			return nil
+		}
+	}
+
+	defer p.statementAdd(line) // 解析缓存的sql语句后,添加当前行
+	return p.parseEvent()
+}
+
+// statementAdd 增加部分sql语句
+func (p *sqlParser) statementAdd(line string) error {
+	_, err := p.buf.WriteString(line)
+	if err != nil {
+		logrus.WithError(err).WithField("statement", "add").Error(line)
 	}
 	return nil
 }

@@ -9,24 +9,36 @@ import (
 	"github.com/teamlint/pg-flow/config"
 	"github.com/teamlint/pg-flow/dump/handler"
 	"github.com/teamlint/pg-flow/event"
+	"github.com/teamlint/shard"
+)
+
+const (
+	DefaultFileSize = uint32(1 * 1024 * 1024) // 1 MB
+	// DefaultFileSize = uint32(512 * 1024) // 512 KB
 )
 
 // ElasticBulkHandler Bulk JSON 导入文件 Handler
 type ElasticBulkHandler struct {
-	maxDocs int // 一次批处理最多文档条数
+	writer *shard.Writer
 }
 
-func New(max int) handler.Handler {
-	return &ElasticBulkHandler{maxDocs: max}
+func New(fileSize uint32) handler.Handler {
+	return &ElasticBulkHandler{writer: shard.NewWriter("dump", shard.FileSize(fileSize), shard.Extension("json"))}
 }
 
 // Register 注册事件Handler
 func Register(cfg *config.Config) {
 	// handler
-	handler.RegisterHandler("esbulk", New(2000))
+	handler.RegisterHandler("esbulk", New(DefaultFileSize))
 }
 
 func (h *ElasticBulkHandler) Handle(evt *event.Event) error {
+	// event over
+	if evt.IsOver() {
+		// h.writer.WriteString("\n")
+		logrus.Infoln("esbulk.handler event is over")
+		return nil
+	}
 	logrus.WithField("evtID", evt.ID).
 		WithField("table", evt.Table).
 		WithField("action", evt.Action).
@@ -37,22 +49,18 @@ func (h *ElasticBulkHandler) Handle(evt *event.Event) error {
 	if evt.Action == "DELETE" {
 		opType = "delete"
 	}
-	// meta := []byte(fmt.Sprintf(`{ "%s" : { "_id" : "%s" } }%s`, opType, docID, "\n"))
-	// meta := []byte(fmt.Sprintf(`{ "%s" : { "_index" : "%s", "_id" : "%s" } }%s`, opType, table, docID, "\n"))
-	// create 测试
-	// opType = "create"
-	meta := []byte(fmt.Sprintf(`{ "%s" : { "_index" : "%s", "_id" : "%s" } }%s`, opType, evt.Table, evt.ID, "\n"))
-	// TODO 删除不需要传送数据
+	meta := []byte(fmt.Sprintf(`{"%s":{"_index":"%s","_id":"%s"}}%s`, opType, evt.Table, evt.ID, "\n"))
 	logrus.Debugf("%s\n", meta) // <-- Uncomment to see the payload
-	dataBytes, _ := json.Marshal(evt.Data)
-	// dataBytes := []byte(evt.Data)
-	dataBytes = append(dataBytes, "\n"...) // <-- Comment out to trigger failure for batch
-	buf.Grow(len(meta) + len(dataBytes))
-	buf.Write(meta)
-	buf.Write(dataBytes)
-	logrus.WithField("doc", buf.String()).
-		Debugln("bulk")
+	if evt.Action != "DELETE" {
+		dataBytes, _ := json.Marshal(evt.Data)
+		// dataBytes := []byte(evt.Data)
+		dataBytes = append(dataBytes, "\n"...) // <-- Comment out to trigger failure for batch
+		buf.Grow(len(meta) + len(dataBytes))
+		buf.Write(meta)
+		buf.Write(dataBytes)
+	}
+	// logrus.WithField("doc", buf.String()).Debugln("bulk")
+	h.writer.Write(buf.Bytes())
 
-	return nil
-
+	return h.writer.Err()
 }

@@ -1,32 +1,17 @@
-/*
- * Copyright 2018 Shanghai Junzheng Network Technology Co.,Ltd.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *	   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-// This code was derived from https://github.com/hellobike/amazonriver
-
 package dump
 
 import (
+	"bufio"
 	"io"
+	"os"
 	"reflect"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/teamlint/pg-flow/event"
 )
 
-func Test_parser_parseWalData(t *testing.T) {
+func TestParse(t *testing.T) {
 	type fields struct {
 		r io.Reader
 	}
@@ -40,13 +25,13 @@ func Test_parser_parseWalData(t *testing.T) {
 		want   *event.Event
 	}{
 		{
-			name: "test1",
+			name: "insert",
 			fields: fields{
 				r: nil,
 			},
 			args: args{
 				// line: `INSERT INTO test_table (id, name) VALUES (1,"amazonriver");`,
-				line: `INSERT INTO public."user" (id, name) VALUES ('7', 'sqlparser');`,
+				line: `INSERT INTO public.user (id, name) VALUES ('7', 'sqlparser');`,
 			},
 
 			want: &event.Event{
@@ -57,7 +42,7 @@ func Test_parser_parseWalData(t *testing.T) {
 			},
 		},
 		{
-			name: "test2",
+			name: "delete",
 			fields: fields{
 				r: nil,
 			},
@@ -67,10 +52,10 @@ func Test_parser_parseWalData(t *testing.T) {
 			want: nil,
 		},
 	}
-	// parseSQL1
+	// parseSQL
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &parser{
+			p := &sqlParser{
 				r: tt.fields.r,
 			}
 			if got := p.parseSQL(tt.args.line); !reflect.DeepEqual(got, tt.want) {
@@ -78,4 +63,40 @@ func Test_parser_parseWalData(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseFile(t *testing.T) {
+	fs, err := os.Open("./test.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fs.Close()
+
+	logrus.SetLevel(logrus.DebugLevel)
+	p := newSQLParser(fs)
+	rb := bufio.NewReaderSize(fs, 1024*16)
+	i := 0
+	for {
+		line, err := rb.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				t.Log("file is end")
+				break
+			}
+			t.Fatal(err)
+		}
+		t.Logf("sql.line = %v", line)
+		evt := p.parseSQL(line)
+		if evt == nil {
+			t.Log("sql.parsing...")
+			continue
+		}
+		// 成功解析sql语句
+		i++
+		t.Logf("sql.parsed[%v]= %+v\n", i, evt)
+	}
+	if i != 17 {
+		t.Errorf("insert statement's count = 17, got %v", i)
+	}
+
 }

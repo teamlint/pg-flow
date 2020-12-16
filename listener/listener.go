@@ -124,7 +124,12 @@ func (l *Listener) Process() error {
 		logger.Infof("create new slot[%s], snapshot[%s]\n", l.slotName, snapshotID)
 		// dump 同步旧数据
 		if l.config.Listener.Dump {
-			l.exportSnapshot(snapshotID)
+			err := l.exportSnapshot(snapshotID)
+			if err != nil {
+				logger.WithError(err).Errorf("snapshot[%s] dump error\n", snapshotID)
+			} else {
+				logger.Infof("snapshot[%s] dump done\n", snapshotID)
+			}
 		}
 	} else {
 		logger.Infof("slot[%s] already exists, LSN updated\n", l.slotName)
