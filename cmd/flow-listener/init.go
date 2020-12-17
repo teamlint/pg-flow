@@ -16,6 +16,7 @@ const (
 	errorLoggerLevel   = "error"
 	fatalLoggerLevel   = "fatal"
 	infoLoggerLevel    = "info"
+	debugLoggerLevel   = "debug"
 )
 
 // initLogger init logrus preferences.
@@ -34,8 +35,10 @@ func initLogger(cfg config.LoggerCfg) {
 		level = logrus.FatalLevel
 	case infoLoggerLevel:
 		level = logrus.InfoLevel
-	default:
+	case debugLoggerLevel:
 		level = logrus.DebugLevel
+	default:
+		level = logrus.InfoLevel
 	}
 	logrus.SetLevel(level)
 }

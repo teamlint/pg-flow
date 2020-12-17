@@ -7,20 +7,20 @@ listener:
   heartbeatInterval: 10s
 
 dumper:
-  handler: 'esbulk' # defaults event, publisher is used. [event,sql,esbulk]
+  handler: 'esbulk' # defaults event, publisher is used. [event,esbulk]
+  filesize: 0 # defaults 0: 1 MB(1*1024*1024), -1: no limit
   path: 
 
 logger:
   caller: false
-  level: info
+  level: 'info' # defaults info, [warning,error,fatal,info,debug]
   humanReadable: true
 
 database:
-  host: 81.90.180.219
+  host: 127.0.0.1
   port: 5432
-  name: scum_db
+  name: test
   user: pglogrepl
-  debug: false
   password: secret
   filter:
     tables:
@@ -33,5 +33,5 @@ publisher:
   type: nats
   address: localhost:4222
   clusterID: test-cluster
-  clientID: wal-listener
+  clientID: flow-client1
   topicPrefix: "pre"

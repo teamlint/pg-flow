@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	DefaultFileSize = uint32(1 * 1024 * 1024) // 1 MB
-	// DefaultFileSize = uint32(512 * 1024) // 512 KB
+	DefaultFileSize = uint32(1 * 1024 * 1024)    // 1 MB
+	MaxFileSize     = uint32(2048 * 1024 * 1024) // 20 GB
 )
 
 // ElasticBulkHandler Bulk JSON 导入文件 Handler
@@ -29,7 +29,17 @@ func New(fileSize uint32) handler.Handler {
 // Register 注册事件Handler
 func Register(cfg *config.Config) {
 	// handler
-	handler.RegisterHandler("esbulk", New(DefaultFileSize))
+	var filesize uint32
+	fs := cfg.Dumper.FileSize
+	switch {
+	case fs > 0:
+		filesize = uint32(fs)
+	case fs < 0:
+		filesize = MaxFileSize
+	default:
+		filesize = DefaultFileSize
+	}
+	handler.RegisterHandler("esbulk", New(filesize))
 }
 
 func (h *ElasticBulkHandler) Handle(evt *event.Event) error {
