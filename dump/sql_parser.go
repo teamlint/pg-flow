@@ -43,7 +43,7 @@ func (p *sqlParser) Parse(h handler.Handler) error {
 			if err == io.EOF {
 				evt := event.Event{
 					ID:         event.OverID,
-					CommitTime: time.Now(),
+					CommitTime: time.Now().UTC(),
 				}
 				logrus.WithField("id", evt.ID).Infoln("event is over")
 				if err = h.Handle(&evt); err != nil {
@@ -104,7 +104,7 @@ func (p *sqlParser) parseEvent() *event.Event {
 				Table:      row.Table.Name.String(),
 				Action:     ActionKindInsert,
 				Data:       data,
-				CommitTime: time.Now(),
+				CommitTime: time.Now().UTC(),
 			}
 			p.buf.Reset()
 			logrus.WithField("ID", evt.ID).

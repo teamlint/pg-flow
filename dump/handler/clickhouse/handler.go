@@ -14,6 +14,9 @@ import (
 const (
 	DefaultFileSize = uint32(10 * 1024 * 1024)   // 10 MB
 	MaxFileSize     = uint32(2048 * 1024 * 1024) // 20 GB
+
+	DefaultRows = 8164  // 默认批处理行数
+	MaxRows     = 50000 // 最大行数
 )
 
 // ClickhouseHandler Clickhouse Handler
@@ -55,6 +58,7 @@ func (h *ClickhouseHandler) createTable() error {
 func (h *ClickhouseHandler) Handle(evt *event.Event) error {
 	// event over
 	if evt.IsOver() {
+		h.writer.Close()
 		logrus.Infoln("clickhouse.handler event is over")
 		return nil
 	}
@@ -65,15 +69,24 @@ func (h *ClickhouseHandler) Handle(evt *event.Event) error {
 
 	var buf bytes.Buffer
 	dataBytes, err := json.Marshal(evt.Data)
+	// evtData, err := evt.MarshalJSON()
 	if err != nil {
 		logrus.WithError(err).Error("clickhouse.handler json.Marshal")
 		return nil
 	}
+	// TODO 针对不同表处理
+
+	// data := gjson.GetBytes(evtData, "data").Raw
 	dataBytes = append(dataBytes, "\n"...)
 	buf.Grow(len(dataBytes))
 	buf.Write(dataBytes)
 	logrus.WithField("dumper.handler", "clickhouse").Debugln(buf.String())
 	h.writer.Write(buf.Bytes())
+
+	// logrus.WithField("dumper.handler", "clickhouse").Debugln(string(dataBytes))
+	// logrus.WithField("dumper.handler", "clickhouse").Debugln(data)
+	// h.writer.WriteString(data + "\n")
+	h.writer.Write(dataBytes)
 	// TODO 实现 clickhouse 数据导入
 
 	return h.writer.Err()

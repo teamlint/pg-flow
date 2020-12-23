@@ -49,7 +49,7 @@ func (h *ElasticBulkHandler) Init(cfg *config.Config) error {
 func (h *ElasticBulkHandler) Handle(evt *event.Event) error {
 	// event over
 	if evt.IsOver() {
-		// h.writer.WriteString("\n")
+		h.writer.Close()
 		logrus.Infoln("esbulk.handler event is over")
 		return nil
 	}
