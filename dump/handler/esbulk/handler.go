@@ -42,6 +42,10 @@ func Register(cfg *config.Config) {
 	handler.RegisterHandler("esbulk", New(filesize))
 }
 
+func (h *ElasticBulkHandler) Init(cfg *config.Config) error {
+	return nil
+}
+
 func (h *ElasticBulkHandler) Handle(evt *event.Event) error {
 	// event over
 	if evt.IsOver() {

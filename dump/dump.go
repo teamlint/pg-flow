@@ -1,5 +1,3 @@
-// This code was derived from https://github.com/hellobike/amazonriver
-
 package dump
 
 import (
@@ -11,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/teamlint/pg-flow/config"
 	"github.com/teamlint/pg-flow/dump/handler"
+	"github.com/teamlint/pg-flow/dump/handler/clickhouse"
 	"github.com/teamlint/pg-flow/dump/handler/esbulk"
 	"github.com/teamlint/pg-flow/dump/handler/event"
 )
@@ -75,10 +74,12 @@ func (d *Dumper) Dump(snapshotID string) error {
 	// handler
 	event.Register(d.conf)
 	esbulk.Register(d.conf)
+	clickhouse.Register(d.conf)
 	hdr, err := handler.GetHandler(d.conf.Dumper.Handler)
 	if err != nil {
 		logrus.WithError(err).WithField("dumper.handler", d.conf.Dumper.Handler).Fatalln("handler.GetHandler")
 	}
+	hdr.Init(d.conf) // dumper handler 初始化,仅执行一次
 	logrus.WithField("dumper.handler", d.conf.Dumper.Handler).Infoln("handler.GetHandler")
 	go func() {
 		err := sqlParser.Parse(hdr)

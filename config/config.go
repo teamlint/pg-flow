@@ -31,6 +31,20 @@ type DumperCfg struct {
 	Path     string // pg_dump 路径
 }
 
+// Table 目标仓库表配置信息
+type Table map[string]string
+
+// Repository 目标数据仓库
+type Repository struct {
+	Host     string `valid:"required"`
+	Port     uint16 `valid:"required"`
+	Name     string `valid:"required"`
+	User     string `valid:"required"`
+	Password string `valid:"required"`
+	Params   map[string]string
+	Tables   map[string]Table
+}
+
 // PublisherCfg path of the evernt publisher config.
 type PublisherCfg struct {
 	Type        string `valid:"required"`

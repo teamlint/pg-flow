@@ -7,9 +7,27 @@ listener:
   heartbeatInterval: 10s
 
 dumper:
-  handler: 'esbulk' # defaults event, publisher is used. [event,esbulk]
+  handler: 'esbulk' # defaults event, publisher is used. [event,esbulk,chddl,clickhouse]
   filesize: 0 # defaults 0: 1 MB(1*1024*1024), -1: no limit
   path: 
+  repository:
+    address: 'tcp://127.0.0.1:9000?dubug=true'
+    host: 127.0.0.1
+    port: 9000
+    name: biz
+    user:
+    password:
+    params:
+      debug: true
+    tables:
+      table_name:
+        engine: 
+        engineParams:
+        orderBy:
+        partitionBy: 
+        primaryKey: 
+        sampleBy:
+        settings:
 
 logger:
   caller: false

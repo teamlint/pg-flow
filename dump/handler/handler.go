@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 
+	"github.com/teamlint/pg-flow/config"
 	"github.com/teamlint/pg-flow/event"
 )
 
@@ -13,6 +14,7 @@ var (
 
 // Handler dump 数据处理器
 type Handler interface {
+	Init(cfg *config.Config) error
 	Handle(evt *event.Event) error
 }
 

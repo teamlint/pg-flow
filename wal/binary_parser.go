@@ -221,7 +221,7 @@ func (p *BinaryParser) readInt16() (val int16) {
 
 func (p *BinaryParser) readTimestamp() time.Time {
 	ns := p.readInt64()
-	return postgresEpoch.Add(time.Duration(ns) * time.Microsecond).Local()
+	return postgresEpoch.Add(time.Duration(ns) * time.Microsecond)
 }
 
 func (p *BinaryParser) readString() (str string) {

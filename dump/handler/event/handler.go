@@ -29,6 +29,10 @@ func Register(cfg *config.Config) {
 	handler.RegisterHandler("event", New(publisher, cfg.Publisher.TopicPrefix))
 }
 
+func (h *EventHandler) Init(cfg *config.Config) error {
+	return nil
+}
+
 func (h *EventHandler) Handle(evt *event.Event) error {
 	if err := h.pub.Publish(evt.GetSubject(h.topicPrefix), evt); err != nil {
 		logrus.Debugf("event handler err = %v\n", err)

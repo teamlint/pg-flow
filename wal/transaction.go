@@ -20,6 +20,10 @@ const (
 	ActionKindInsert ActionKind = "INSERT"
 	ActionKindUpdate ActionKind = "UPDATE"
 	ActionKindDelete ActionKind = "DELETE"
+	// SQL Timestamp
+	SQLTimestamptzLayout = "2006-01-02 15:04:05.999999-07"
+	SQLTimestampLayout   = "2006-01-02 15:04:05.999999"
+	SQLDateLayout        = "2006-01-02"
 )
 
 // Transaction transaction specified WAL message.
@@ -69,18 +73,52 @@ type Column struct {
 // on the type of this data in the database table.
 func (c *Column) AssertValue(src []byte) {
 	var val interface{}
+	var err error
 	strSrc := string(src)
 	switch c.valueType {
 	case pgtype.BoolOID:
 		val, _ = strconv.ParseBool(strSrc)
 	case pgtype.Int4OID:
 		val, _ = strconv.Atoi(strSrc)
-	case pgtype.TextOID:
+	case pgtype.Int8OID:
+		val, _ = strconv.ParseInt(strSrc, 10, 64)
+	case pgtype.TextOID, pgtype.VarcharOID, pgtype.BPCharOID:
 		val = strSrc
-	case pgtype.TimestampOID, pgtype.TimestamptzOID:
-		val = strSrc
-	case pgtype.VarcharOID:
-		val = strSrc
+	case pgtype.DateOID:
+		if strSrc == "" {
+			val = nil
+		} else {
+			val, err = time.Parse(SQLDateLayout, strSrc)
+			if err != nil {
+				logrus.WithField("pgtype", c.valueType).Errorf("%s => %v ", strSrc, val)
+			}
+		}
+	case pgtype.TimestampOID:
+		if strSrc == "" {
+			val = nil
+		} else {
+			val, err = time.Parse(SQLTimestampLayout, strSrc)
+			if err != nil {
+				logrus.WithField("pgtype", c.valueType).Errorf("%s => %v ", strSrc, val)
+			}
+		}
+	case pgtype.TimestamptzOID:
+		if strSrc == "" {
+			val = nil
+		} else {
+			tz, err := time.Parse(SQLTimestamptzLayout, strSrc)
+			if err != nil {
+				logrus.WithField("pgtype", c.valueType).Errorf("%s => %v ", strSrc, tz)
+			}
+			val = tz.UTC()
+			// logrus.WithField("pgtype", c.valueType).Infof("%s => %v ", strSrc, val)
+		}
+	case pgtype.JSONBOID, pgtype.JSONOID:
+		if strSrc == "" {
+			val = nil
+		} else {
+			val = strSrc
+		}
 	default:
 		logrus.WithField("pgtype", c.valueType).Warnln("unknown oid type")
 		val = strSrc
