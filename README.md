@@ -10,3 +10,8 @@ PostgreSQL WAL Processor/Listener
 
 ## 注意事项
 - clickhouse 需要配置 date_time_input_format='best_effort'
+
+## TODO
+- clickhouse ddl
+- clickhouse 批量导入
+- dump 运行完开始事件监听

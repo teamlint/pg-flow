@@ -22,4 +22,6 @@ type Replicator interface {
 	IsAlive() bool
 	// 关闭链接
 	Close() error
+	// 生成 DDL
+	GenerateDDL() (string, error)
 }

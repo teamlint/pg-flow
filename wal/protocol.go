@@ -29,6 +29,9 @@ const (
 	// DeleteMsgType protocol delete message type.
 	DeleteMsgType byte = 'D'
 
+	// TruncateMsgType protocol truncate message type.
+	TruncateMsgType byte = 'T'
+
 	// NewTupleDataType protocol new tuple data type.
 	NewTupleDataType byte = 'N'
 
@@ -46,6 +49,7 @@ var postgresEpoch = time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 // Logical Replication Message Formats.
 // https://postgrespro.ru/docs/postgrespro/10/protocol-logicalrep-message-formats#
+// See https://www.postgresql.org/docs/current/static/protocol-logicalrep-message-formats.html
 type (
 	// Begin message format.
 	Begin struct {
@@ -127,6 +131,17 @@ type (
 		OldTuple bool
 		// TupleData message part representing the contents of new tuple.
 		Row []TupleData
+	}
+
+	Truncate struct {
+		// Raw             []byte
+		// Cascade         bool
+		// RestartIdentity bool
+		// RelationOIDs    []utils.OID
+
+		// Option bits for TRUNCATE: 1 for CASCADE, 2 for RESTART IDENTITY
+		Option       int8
+		RelationOIDs []int32
 	}
 )
 

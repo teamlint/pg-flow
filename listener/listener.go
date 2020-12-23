@@ -14,10 +14,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/teamlint/pg-flow/config"
+	"github.com/teamlint/pg-flow/database"
 	"github.com/teamlint/pg-flow/dump"
 	"github.com/teamlint/pg-flow/event"
 	"github.com/teamlint/pg-flow/replicator"
-	"github.com/teamlint/pg-flow/repository"
 	"github.com/teamlint/pg-flow/wal"
 )
 
@@ -41,7 +41,7 @@ type Listener struct {
 	slotName   string
 	publisher  event.Publisher
 	replicator replicator.Replicator
-	repository repository.Repository
+	db         database.Database
 	parser     wal.Parser
 	lsn        uint64
 	errChannel chan error
@@ -50,7 +50,7 @@ type Listener struct {
 // New create and initialize new listener service instance.
 func New(
 	cfg *config.Config,
-	repo repository.Repository,
+	db database.Database,
 	repl replicator.Replicator,
 	publ event.Publisher,
 	parser wal.Parser,
@@ -59,7 +59,7 @@ func New(
 		slotName:   fmt.Sprintf("%s_%s", cfg.Listener.SlotName, cfg.Database.Name),
 		config:     *cfg,
 		publisher:  publ,
-		repository: repo,
+		db:         db,
 		replicator: repl,
 		parser:     parser,
 		errChannel: make(chan error, errorBufferSize),
@@ -93,7 +93,7 @@ func (l *Listener) Process() error {
 		return err
 	}
 	if !pubExists {
-		if err := l.repository.CreatePublication(l.getPublicationName()); err != nil {
+		if err := l.db.CreatePublication(l.getPublicationName()); err != nil {
 			logger.WithError(err).Infoln("CreatePublication() error")
 			return err
 		}
@@ -147,7 +147,7 @@ ProcessLoop:
 			if !l.replicator.IsAlive() {
 				logrus.Fatalln(ErrReplConnectionIsLost)
 			}
-			if !l.repository.IsAlive() {
+			if !l.db.IsAlive() {
 				logrus.Fatalln(ErrConnectionIsLost)
 				l.errChannel <- ErrConnectionIsLost
 			}
@@ -172,7 +172,7 @@ ProcessLoop:
 
 // slotIsExists checks whether a slot has already been created and if it has been created uses it.
 func (l *Listener) slotIsExists() (bool, error) {
-	restartLSNStr, err := l.repository.GetSlotLSN(l.slotName)
+	restartLSNStr, err := l.db.GetSlotLSN(l.slotName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logrus.
@@ -204,7 +204,7 @@ func (l *Listener) getPublicationName() string {
 
 // publicationIsExists 检查发布是否存在
 func (l *Listener) publicationIsExists() (bool, error) {
-	return l.repository.PublicationIsExists(l.getPublicationName())
+	return l.db.PublicationIsExists(l.getPublicationName())
 }
 
 func publicationNames(publication string) string {
@@ -299,7 +299,7 @@ func (l *Listener) Stop() error {
 	if err != nil {
 		return err
 	}
-	err = l.repository.Close()
+	err = l.db.Close()
 	if err != nil {
 		return err
 	}

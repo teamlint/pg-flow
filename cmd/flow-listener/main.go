@@ -10,10 +10,10 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/teamlint/pg-flow/config"
+	"github.com/teamlint/pg-flow/database"
 	"github.com/teamlint/pg-flow/event"
 	"github.com/teamlint/pg-flow/event/publisher/nats"
 	"github.com/teamlint/pg-flow/listener"
-	"github.com/teamlint/pg-flow/repository"
 	"github.com/teamlint/pg-flow/wal"
 )
 
@@ -49,7 +49,7 @@ func main() {
 			if err != nil {
 				logrus.Fatal(err)
 			}
-			repo := repository.New(conn)
+			repo := database.New(conn)
 			// publisher
 			nats.Register(cfg)
 			publisher, err := event.GetPublisher(cfg.Publisher.Type)
