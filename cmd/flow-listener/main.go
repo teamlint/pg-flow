@@ -14,6 +14,7 @@ import (
 	"github.com/teamlint/pg-flow/event"
 	"github.com/teamlint/pg-flow/event/publisher/nats"
 	"github.com/teamlint/pg-flow/listener"
+	"github.com/teamlint/pg-flow/replicator"
 	"github.com/teamlint/pg-flow/wal"
 )
 
@@ -44,12 +45,15 @@ func main() {
 			}
 			// logger
 			initLogger(cfg.Logger)
-			// database
-			conn, rConn, err := initPgxConnections(cfg.Database)
+			// init connections
+			conn, replConn, err := database.InitConnections(cfg.Database)
 			if err != nil {
 				logrus.Fatal(err)
 			}
-			repo := database.New(conn)
+			// database
+			db := database.New(conn)
+			// replicator
+			repl := replicator.New(replConn)
 			// publisher
 			nats.Register(cfg)
 			publisher, err := event.GetPublisher(cfg.Publisher.Type)
@@ -59,7 +63,7 @@ func main() {
 			// wal parser
 			parser := wal.NewBinaryParser(binary.BigEndian)
 			// listener
-			l := listener.New(cfg, repo, rConn, publisher, parser)
+			l := listener.New(cfg, db, repl, publisher, parser)
 			return l.Process()
 		},
 	}
@@ -84,4 +88,37 @@ func getConf(path string) (*config.Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// logger log levels.
+const (
+	warningLoggerLevel = "warning"
+	errorLoggerLevel   = "error"
+	fatalLoggerLevel   = "fatal"
+	infoLoggerLevel    = "info"
+	debugLoggerLevel   = "debug"
+)
+
+// initLogger init logrus preferences.
+func initLogger(cfg config.LoggerCfg) {
+	logrus.SetReportCaller(cfg.Caller)
+	if !cfg.HumanReadable {
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	}
+	var level logrus.Level
+	switch cfg.Level {
+	case warningLoggerLevel:
+		level = logrus.WarnLevel
+	case errorLoggerLevel:
+		level = logrus.ErrorLevel
+	case fatalLoggerLevel:
+		level = logrus.FatalLevel
+	case infoLoggerLevel:
+		level = logrus.InfoLevel
+	case debugLoggerLevel:
+		level = logrus.DebugLevel
+	default:
+		level = logrus.InfoLevel
+	}
+	logrus.SetLevel(level)
 }

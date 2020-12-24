@@ -25,3 +25,42 @@ type Replicator interface {
 	// 生成 DDL
 	GenerateDDL() (string, error)
 }
+
+type DefaultReplicator struct {
+	conn *pgx.ReplicationConn
+}
+
+func New(conn *pgx.ReplicationConn) Replicator {
+	return &DefaultReplicator{conn: conn}
+}
+
+func (r *DefaultReplicator) CreateReplicationSlotEx(slotName, outputPlugin string) (consistentPoint string, snapshotName string, err error) {
+	return r.conn.CreateReplicationSlotEx(slotName, outputPlugin)
+}
+
+func (r *DefaultReplicator) DropReplicationSlot(slotName string) (err error) {
+	return r.conn.DropReplicationSlot(slotName)
+}
+
+func (r *DefaultReplicator) StartReplication(slotName string, startLsn uint64, timeline int64, pluginArguments ...string) (err error) {
+	return r.conn.StartReplication(slotName, startLsn, timeline, pluginArguments...)
+}
+func (r *DefaultReplicator) WaitForReplicationMessage(ctx context.Context) (*pgx.ReplicationMessage, error) {
+	return r.conn.WaitForReplicationMessage(ctx)
+}
+
+func (r *DefaultReplicator) SendStandbyStatus(k *pgx.StandbyStatus) (err error) {
+	return r.conn.SendStandbyStatus(k)
+}
+
+func (r *DefaultReplicator) IsAlive() bool {
+	return r.conn.IsAlive()
+}
+
+func (r *DefaultReplicator) Close() error {
+	return r.conn.Close()
+}
+
+func (r *DefaultReplicator) GenerateDDL() (string, error) {
+	return "", nil
+}

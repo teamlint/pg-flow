@@ -21,7 +21,14 @@ import (
 	"github.com/teamlint/pg-flow/wal"
 )
 
-const errorBufferSize = 100
+const (
+	errorBufferSize = 100
+
+	ErrMsgPublishEvent      = "publish message error"
+	ErrMsgUnmarshalMsg      = "unmarshal wal message error"
+	ErrMsgAckWalMessage     = "acknowledge wal message error"
+	ErrMsgSendStandbyStatus = "send standby status error"
+)
 
 // Logical decoding plugin.
 const (
@@ -145,11 +152,11 @@ ProcessLoop:
 		select {
 		case <-refresh.C:
 			if !l.replicator.IsAlive() {
-				logrus.Fatalln(ErrReplConnectionIsLost)
+				logrus.Fatalln(database.ErrReplConnectionIsLost)
 			}
 			if !l.db.IsAlive() {
-				logrus.Fatalln(ErrConnectionIsLost)
-				l.errChannel <- ErrConnectionIsLost
+				logrus.Fatalln(database.ErrConnectionIsLost)
+				l.errChannel <- database.ErrConnectionIsLost
 			}
 		case err := <-l.errChannel:
 			if errors.As(err, &serviceErr) {
@@ -242,7 +249,7 @@ func (l *Listener) Stream(ctx context.Context) {
 				err := l.parser.ParseMessage(msg.WalMessage.WalData, tx)
 				if err != nil {
 					logrus.WithError(err).Errorln("msg parse failed")
-					l.errChannel <- fmt.Errorf("%v: %w", ErrUnmarshalMsg, err)
+					l.errChannel <- fmt.Errorf("%v: %w", ErrMsgUnmarshalMsg, err)
 					continue
 				}
 				if tx.CommitTime != nil {
@@ -250,7 +257,7 @@ func (l *Listener) Stream(ctx context.Context) {
 					for _, event := range events {
 						subjectName := event.GetSubject(l.config.Publisher.TopicPrefix)
 						if err = l.publisher.Publish(subjectName, event); err != nil {
-							l.errChannel <- fmt.Errorf("%v: %w", ErrPublishEvent, err)
+							l.errChannel <- fmt.Errorf("%v: %w", ErrMsgPublishEvent, err)
 							continue
 						} else {
 							logrus.
@@ -266,7 +273,7 @@ func (l *Listener) Stream(ctx context.Context) {
 				if msg.WalMessage.WalStart > l.readLSN() {
 					err = l.AckWalMessage(msg.WalMessage.WalStart)
 					if err != nil {
-						l.errChannel <- fmt.Errorf("%v: %w", ErrAckWalMessage, err)
+						l.errChannel <- fmt.Errorf("%v: %w", ErrMsgAckWalMessage, err)
 						continue
 					} else {
 						logrus.WithField("lsn", l.readLSN()).Debugln("ack wal msg")
@@ -284,7 +291,7 @@ func (l *Listener) Stream(ctx context.Context) {
 					logrus.Debugln("status requested")
 					err = l.SendStandbyStatus()
 					if err != nil {
-						l.errChannel <- fmt.Errorf("%v: %w", ErrSendStandbyStatus, err)
+						l.errChannel <- fmt.Errorf("%v: %w", ErrMsgSendStandbyStatus, err)
 					}
 				}
 			}
@@ -364,4 +371,17 @@ func (l *Listener) exportSnapshot(snapshotID string) error {
 	}
 	dumper := dump.New(&l.config)
 	return dumper.Dump(snapshotID)
+}
+
+type serviceErr struct {
+	Caller string
+	Err    error
+}
+
+func newListenerError(caller string, err error) *serviceErr {
+	return &serviceErr{Caller: caller, Err: err}
+}
+
+func (e *serviceErr) Error() string {
+	return e.Caller + ": " + e.Err.Error()
 }
