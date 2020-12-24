@@ -22,8 +22,6 @@ type Replicator interface {
 	IsAlive() bool
 	// 关闭链接
 	Close() error
-	// 生成 DDL
-	GenerateDDL() (string, error)
 }
 
 type DefaultReplicator struct {
@@ -59,8 +57,4 @@ func (r *DefaultReplicator) IsAlive() bool {
 
 func (r *DefaultReplicator) Close() error {
 	return r.conn.Close()
-}
-
-func (r *DefaultReplicator) GenerateDDL() (string, error) {
-	return "", nil
 }

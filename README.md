@@ -14,4 +14,6 @@ PostgreSQL WAL Processor/Listener
 ## TODO
 - clickhouse ddl
 - clickhouse 批量导入
+- dump/repository/repository.go 获取列信息 scheme参数动态获取
 - dump 运行完开始事件监听
+- ddl 引擎生成需要增加更多引擎判断

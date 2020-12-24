@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 
+	"github.com/jackc/pgx"
 	"github.com/sirupsen/logrus"
 	"github.com/teamlint/pg-flow/config"
 	"github.com/teamlint/pg-flow/dump/handler"
+	chrepo "github.com/teamlint/pg-flow/dump/repository/clickhouse"
 	"github.com/teamlint/pg-flow/event"
 	"github.com/teamlint/shard"
 )
@@ -22,6 +24,7 @@ const (
 // ClickhouseHandler Clickhouse Handler
 type ClickhouseHandler struct {
 	writer *shard.Writer
+	conn   *pgx.Conn
 }
 
 func New(fileSize uint32) handler.Handler {
@@ -45,14 +48,13 @@ func Register(cfg *config.Config) {
 }
 
 func (h *ClickhouseHandler) Init(cfg *config.Config) error {
-	// 转换postgresql表结构到clickhouse表结构
-	// 创建表
-	return nil
-}
-
-func (h *ClickhouseHandler) createTable() error {
-	// TODO  创建 Clickhouse 表
-	return nil
+	ch, err := chrepo.New(cfg)
+	if err != nil {
+		logrus.WithError(err).Errorln("handler.Init")
+		return err
+	}
+	defer ch.Close()
+	return ch.CreateTables()
 }
 
 func (h *ClickhouseHandler) Handle(evt *event.Event) error {

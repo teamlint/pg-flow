@@ -26,23 +26,25 @@ type ListenerCfg struct {
 }
 
 type DumperCfg struct {
-	Handler  string // Dump Handler: event,sql,es 默认event, 适合历史数据较少情况
-	FileSize int    // Dump 文件大小字节: 0 使用默认 1 MB, -1 不限制文件大小,最大文件20GB
-	Path     string // pg_dump 路径
+	Handler    string // Dump Handler: event,sql,es 默认event, 适合历史数据较少情况
+	FileSize   int    // Dump 文件大小字节: 0 使用默认 1 MB, -1 不限制文件大小,最大文件20GB
+	Path       string // pg_dump 路径
+	Repository RepositoryCfg
 }
 
 // Table 目标仓库表配置信息
 type Table map[string]string
 
 // Repository 目标数据仓库
-type Repository struct {
-	Host     string `valid:"required"`
-	Port     uint16 `valid:"required"`
-	Name     string `valid:"required"`
-	User     string `valid:"required"`
-	Password string `valid:"required"`
-	Params   map[string]string
-	Tables   map[string]Table
+type RepositoryCfg struct {
+	Host               string
+	Port               uint16
+	Name               string
+	User               string
+	Password           string
+	Params             map[string]string
+	DefaultTableEngine string
+	Tables             map[string]Table
 }
 
 // PublisherCfg path of the evernt publisher config.

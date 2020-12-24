@@ -20,18 +20,18 @@ type Database interface {
 	Close() error
 }
 
-// DatabaseImpl service repository.
-type DatabaseImpl struct {
+// DefaultDatabase service database.
+type DefaultDatabase struct {
 	conn *pgx.Conn
 }
 
-// New returns a new instance of the repository.
-func New(conn *pgx.Conn) *DatabaseImpl {
-	return &DatabaseImpl{conn: conn}
+// New returns a new instance of the database.
+func New(conn *pgx.Conn) *DefaultDatabase {
+	return &DefaultDatabase{conn: conn}
 }
 
 // GetSlotLSN returns the value of the last offset for a specific slot.
-func (r DatabaseImpl) GetSlotLSN(slotName string) (string, error) {
+func (r DefaultDatabase) GetSlotLSN(slotName string) (string, error) {
 	var restartLSNStr string
 	err := r.conn.QueryRow(
 		"SELECT restart_lsn FROM pg_replication_slots WHERE slot_name=$1;",
@@ -41,7 +41,7 @@ func (r DatabaseImpl) GetSlotLSN(slotName string) (string, error) {
 }
 
 // PublicationIsExists 检查发布是否存在
-func (r DatabaseImpl) PublicationIsExists(pubName string) (bool, error) {
+func (r DefaultDatabase) PublicationIsExists(pubName string) (bool, error) {
 	var name string
 	err := r.conn.QueryRow(
 		"SELECT pubname FROM pg_catalog.pg_publication WHERE pubname=$1;",
@@ -57,7 +57,7 @@ func (r DatabaseImpl) PublicationIsExists(pubName string) (bool, error) {
 }
 
 // CreatePublication 创建发布
-func (r DatabaseImpl) CreatePublication(pubName string) error {
+func (r DefaultDatabase) CreatePublication(pubName string) error {
 	sql := "CREATE PUBLICATION " + pubName + " FOR ALL TABLES;"
 	_, err := r.conn.Exec(sql)
 	// _, err := r.conn.Exec("CREATE PUBLICATION $1 FOR ALL TABLES;", pubName)
@@ -65,11 +65,11 @@ func (r DatabaseImpl) CreatePublication(pubName string) error {
 }
 
 // IsAlive check database connection problems.
-func (r DatabaseImpl) IsAlive() bool {
+func (r DefaultDatabase) IsAlive() bool {
 	return r.conn.IsAlive()
 }
 
 // Close database connection.
-func (r DatabaseImpl) Close() error {
+func (r DefaultDatabase) Close() error {
 	return r.conn.Close()
 }

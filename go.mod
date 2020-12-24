@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	bou.ke/monkey v1.0.2
+	github.com/ClickHouse/clickhouse-go v1.4.3
 	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.10.0
@@ -23,7 +24,6 @@ require (
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.6.1
 	github.com/teamlint/shard v0.1.0
-	github.com/tidwall/gjson v1.6.4
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	google.golang.org/protobuf v1.25.0 // indirect
