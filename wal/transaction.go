@@ -165,7 +165,7 @@ func (w Transaction) CreateActionData(
 
 // CreateEventsWithFilter filter WAL message by table,
 // action and create events for each value.
-func (w *Transaction) CreateEventsWithFilter(tableMap map[string][]string) []*event.Event {
+func (w *Transaction) CreateEventsWithFilter(schema string, tableMap map[string][]string) []*event.Event {
 	var events []*event.Event
 
 	for _, item := range w.Actions {
@@ -182,9 +182,10 @@ func (w *Transaction) CreateEventsWithFilter(tableMap map[string][]string) []*ev
 			CommitTime: *w.CommitTime,
 		}
 
+		validSchema := eqSchema(schema, item.Schema)
 		actions, validTable := tableMap[item.Table]
 		validAction := inArray(actions, item.Kind.string())
-		if validTable && validAction {
+		if validSchema && validTable && validAction {
 			events = append(events, &evt)
 		} else {
 			logrus.WithFields(
@@ -207,4 +208,10 @@ func inArray(arr []string, value string) bool {
 		}
 	}
 	return false
+}
+func eqSchema(schema string, value string) bool {
+	if schema == "" {
+		return true
+	}
+	return strings.EqualFold(schema, value)
 }

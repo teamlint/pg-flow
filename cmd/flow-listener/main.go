@@ -63,6 +63,7 @@ func main() {
 			// wal parser
 			parser := wal.NewBinaryParser(binary.BigEndian)
 			// listener
+			logrus.Debugf("config = %+v\n", cfg)
 			l := listener.New(cfg, db, repl, publisher, parser)
 			return l.Process()
 		},

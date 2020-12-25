@@ -82,7 +82,7 @@ func (h *ClickhouseHandler) Handle(evt *event.Event) error {
 	dataBytes = append(dataBytes, "\n"...)
 	buf.Grow(len(dataBytes))
 	buf.Write(dataBytes)
-	logrus.WithField("dumper.handler", "clickhouse").Debugln(buf.String())
+	// logrus.WithField("dumper.handler", "clickhouse").Debugln(buf.String())
 	h.writer.Write(buf.Bytes())
 
 	// logrus.WithField("dumper.handler", "clickhouse").Debugln(string(dataBytes))

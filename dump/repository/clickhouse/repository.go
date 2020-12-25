@@ -1,7 +1,6 @@
 package clickhouse
 
 import (
-	"context"
 	"database/sql/driver"
 	"fmt"
 	"net/url"
@@ -12,12 +11,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/teamlint/pg-flow/config"
+	"github.com/teamlint/pg-flow/database"
 )
 
 type ClickhouseRepository struct {
-	cfg    *config.Config
-	pgconn *pgx.ReplicationConn
-	ch     clickhouse.Clickhouse
+	cfg *config.Config
+	db  database.Database
+	ch  clickhouse.Clickhouse
 }
 
 // New
@@ -32,7 +32,9 @@ func New(cfg *config.Config) (*ClickhouseRepository, error) {
 		logrus.WithError(err).Errorln("ClickhouseRepository.postgresConnect")
 		return nil, err
 	}
-	repo.pgconn = pgconn
+	// repo.pgconn = pgconn
+	db := database.New(pgconn)
+	repo.db = db
 	// clickhouse
 	ch, err := clickhouseConnect(cfg.Dumper.Repository)
 	if err != nil {
@@ -44,7 +46,7 @@ func New(cfg *config.Config) (*ClickhouseRepository, error) {
 }
 
 // postgresConnect 创建 Postgresql 数据库连接
-func postgresConnect(cfg config.DatabaseCfg) (*pgx.ReplicationConn, error) {
+func postgresConnect(cfg config.DatabaseCfg) (*pgx.Conn, error) {
 	pgxConf := pgx.ConnConfig{
 		// LogLevel: pgx.LogLevelInfo,
 		Host:     cfg.Host,
@@ -54,7 +56,8 @@ func postgresConnect(cfg config.DatabaseCfg) (*pgx.ReplicationConn, error) {
 		Password: cfg.Password,
 	}
 
-	conn, err := pgx.ReplicationConnect(pgxConf)
+	// conn, err := pgx.ReplicationConnect(pgxConf)
+	conn, err := pgx.Connect(pgxConf)
 	if err != nil {
 		logrus.WithError(err).Error("clickhouse.PostgresConnect")
 		return nil, err
@@ -88,150 +91,167 @@ func connectionString(c config.RepositoryCfg) string {
 }
 
 // GenerateDDL 生成DDL语句
-func (r *ClickhouseRepository) generateDDL() (string, error) {
-	// return "ddl statement", nil
-	var tableDDL string
+func (r *ClickhouseRepository) generateDDL(databaseName string, schemaName string, tblName string) (string, error) {
+	// for tblName, _ := range r.cfg.Database.Filter.Tables {
+	var (
+		pkNum        int
+		engineParams string
+		orderBy      string
+	)
 
-	ctx := context.Background()
-	tx, err := r.pgconn.BeginEx(ctx, &pgx.TxOptions{
-		IsoLevel:   pgx.RepeatableRead,
-		AccessMode: pgx.ReadOnly})
+	pgColumns, err := r.db.GetTableColumns(schemaName, tblName)
 	if err != nil {
-		return "", errors.Wrapf(err, "could not start pg transaction")
+		return "", errors.Wrapf(err, "could not get columns for %s.%s postgres table", schemaName, tblName)
 	}
-	for tblName, _ := range r.cfg.Database.Filter.Tables {
-		var (
-			pkNum        int
-			engineParams string
-			orderBy      string
-		)
 
-		schema := "public"
-		walColumns, pgColumns, err := TablePGColumns(tx, schema, tblName)
-		_ = walColumns
+	if len(pgColumns) < 1 {
+		return "", errors.Wrapf(err, "could not get columns for %s.%s postgres table", schemaName, tblName)
+	}
+
+	// clickhouse 表配置
+	tblCfg, tblOK := r.cfg.Dumper.Repository.Tables[tblName]
+	chColumnDDLs := make([]string, 0)
+
+	for _, pgCol := range pgColumns {
+		// 如果有表配置
+		// TODO
+		// if tblOK {
+		// 	// 如果有列配置
+		// 	colsCfg, colsOK := tblCfg["columns"]
+		// 	if colsOK {
+		// 		// 如果不包含指定列, 跳过
+		// 		if colsCfg[name] == "" {
+		// 			continue
+		// 		}
+		// 	}
+		// }
+		// 没有表配置或没有列配置, 则全列复制
+		// 转换pg列到ch列
+		chColType, err := PG2CHType(pgCol)
 		if err != nil {
-			return "", errors.Wrapf(err, "could not get columns for %s.%s postgres table", schema, tblName)
+			return "", errors.Wrapf(err, "could not get clickhouse column definition")
+		}
+		if pgCol.PKNum > 0 && pgCol.PKNum > pkNum {
+			pkNum = pgCol.PKNum
 		}
 
-		// clickhouse 表配置
-		tblCfg, tblOK := r.cfg.Dumper.Repository.Tables[tblName]
-		chColumnDDLs := make([]string, 0)
+		chColumnDDLs = append(chColumnDDLs, fmt.Sprintf("    %s %s", pgCol.Name, chColType))
+	}
+	// 主键列
+	pkColumns := make([]string, pkNum)
 
-		for name, pgCol := range pgColumns {
-			// 如果有表配置
-			// TODO
-			// if tblOK {
-			// 	// 如果有列配置
-			// 	colsCfg, colsOK := tblCfg["columns"]
-			// 	if colsOK {
-			// 		// 如果不包含指定列, 跳过
-			// 		if colsCfg[name] == "" {
-			// 			continue
-			// 		}
-			// 	}
-			// }
-			// 没有表配置或没有列配置, 则全列复制
-			// 转换pg列到ch列
-			chColType, err := PG2CHType(pgCol)
-			if err != nil {
-				return "", errors.Wrapf(err, "could not get clickhouse column definition")
-			}
-			if pgCol.PKNum > 0 && pgCol.PKNum > pkNum {
-				pkNum = pgCol.PKNum
-			}
-
-			chColumnDDLs = append(chColumnDDLs, fmt.Sprintf("    %s %s", name, chColType))
-		}
-		// 主键列
-		pkColumns := make([]string, pkNum)
-
-		for pgColName, pgCol := range pgColumns {
-			if pgCol.PKNum < 1 {
-				continue
-			}
-
-			pkColumns[pgCol.PKNum-1] = pgColName
+	for _, pgCol := range pgColumns {
+		if pgCol.PKNum < 1 {
+			continue
 		}
 
-		param := tblCfg["generationColumn"]
-		if param != "" {
-			chColumnDDLs = append(chColumnDDLs, fmt.Sprintf("    %s UInt32", param))
-		}
-
-		// 表引擎
-		tableEngine := tblCfg["engine"]
-		if tblOK {
-
-			switch tableEngine {
-			case MergeTree:
-			case ReplacingMergeTree:
-				engineParams = tblCfg["verColumn"]
-				if engineParams != "" {
-					chColumnDDLs = append(chColumnDDLs, fmt.Sprintf("    %s UInt64", engineParams))
-				}
-				// chColumnDDLs = append(chColumnDDLs, fmt.Sprintf("    %s UInt8", tblCfg["deletedColumn"])
-			case CollapsingMergeTree:
-				engineParams = tblCfg["signColumn"]
-				chColumnDDLs = append(chColumnDDLs, fmt.Sprintf("    %s Int8", engineParams))
-			case VersionedCollapsingMergeTree:
-				engineParams = tblCfg["signColumn"]
-				chColumnDDLs = append(chColumnDDLs, fmt.Sprintf("    %s Int8", engineParams))
-				engineParams += tblCfg["verColumn"]
-				chColumnDDLs = append(chColumnDDLs, fmt.Sprintf("    %s UInt64", engineParams))
-			}
-		}
-		// default table engine
-		if tableEngine == "" {
-			defaultTableEngine := r.cfg.Dumper.Repository.DefaultTableEngine
-			if defaultTableEngine == "" {
-				defaultTableEngine = ReplacingMergeTree
-			}
-			tableEngine = defaultTableEngine
-		}
-		tableDDL = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n%s\n) Engine = %s(%s)",
-			tblName,
-			strings.Join(chColumnDDLs, ",\n"),
-			tableEngine, engineParams)
-
-		if tblCfg["orderBy"] == "" {
-			if len(pkColumns) > 0 {
-				orderBy = fmt.Sprintf(" ORDER BY(%s)", strings.Join(pkColumns, ", "))
-			}
-		} else {
-			orderBy = fmt.Sprintf(" ORDER BY(%s)", tblCfg["orderBy"])
-		}
-		tableDDL += orderBy + ";\n"
+		pkColumns[pgCol.PKNum-1] = pgCol.Name
 	}
 
-	// 	fmt.Println(tableDDL)
+	param := tblCfg["generationcolumn"]
+	if param != "" {
+		chColumnDDLs = append(chColumnDDLs, fmt.Sprintf("    %s UInt32", param))
+	}
 
-	// 	if tblCfg.ChBufferTable != "" {
-	// 		fmt.Println(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n%s\n) Engine = MergeTree()%s;",
-	// 			tblCfg.ChBufferTable,
-	// 			strings.Join(
-	// 				append(chColumnDDLs, fmt.Sprintf("    %s UInt64", tblCfg.BufferTableRowIdColumn)), ",\n"),
-	// 			orderBy))
-	// 	}
+	// 表引擎
+	tableEngine := tblCfg["engine"]
+	if tblOK {
+		// chColumnDDLs 是否重复添加关键列?
+		switch tableEngine {
+		case MergeTree:
+		case ReplacingMergeTree:
+			engineParams = tblCfg["vercolumn"]
+			// chColumnDDLs = append(chColumnDDLs, fmt.Sprintf("    %s UInt8", tblCfg["deletedcolumn"])
+		case CollapsingMergeTree:
+			engineParams = tblCfg["signcolumn"]
+			if engineParams == "" {
+				return "", errors.Errorf("%s engine: signColumn must be set", CollapsingMergeTree)
+			}
+		case VersionedCollapsingMergeTree:
+			engineParams = tblCfg["signcolumn"]
+			if engineParams == "" {
+				return "", errors.Errorf("%s engine: signColumn must be set", VersionedCollapsingMergeTree)
+			}
+			verParams := tblCfg["vercolumn"]
+			if verParams == "" {
+				return "", errors.Errorf("%s engine: verColumn must be set", VersionedCollapsingMergeTree)
+			}
+			engineParams += verParams
+		}
+	}
+	// default table engine
+	if tableEngine == "" {
+		defaultTableEngine := r.cfg.Dumper.Repository.DefaultTableEngine
+		if defaultTableEngine == "" {
+			defaultTableEngine = ReplacingMergeTree
+		}
+		tableEngine = defaultTableEngine
+	}
+	tableDDL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s (\n%s\n)\nEngine = %s(%s)",
+		databaseName,
+		tblName,
+		strings.Join(chColumnDDLs, ",\n"),
+		tableEngine, engineParams)
 
+	// PARTITION BY
+	if partitionBy := tblCfg["partitionby"]; partitionBy != "" {
+		tableDDL += fmt.Sprintf("\nPARTITION BY %s", partitionBy)
+	}
+	// ORDER BY
+	if tblCfg["orderby"] == "" {
+		if len(pkColumns) > 0 {
+			orderBy = fmt.Sprintf("\nORDER BY (%s)", strings.Join(pkColumns, ", "))
+		}
+	} else {
+		orderBy = fmt.Sprintf("\nORDER BY (%s)", tblCfg["orderby"])
+	}
+	tableDDL += orderBy
+	// PRIMARY KEY
+	if primaryKey := tblCfg["primarykey"]; primaryKey != "" {
+		tableDDL += fmt.Sprintf("\nPRIMARY KEY %s", primaryKey)
+	}
+	// SAMPLE BY
+	if sampleBy := tblCfg["sampleby"]; sampleBy != "" {
+		tableDDL += fmt.Sprintf("\nSAMPLE BY %s", sampleBy)
+	}
+	// SETTINGS
+	if settings := tblCfg["settings"]; settings != "" {
+		tableDDL += fmt.Sprintf("\nSETTINGS %s", settings)
+	}
+	tableDDL += ";"
 	// }
 
 	return tableDDL, nil
 }
 func (r *ClickhouseRepository) CreateTables() error {
-	// generate DDL
-	ddl, err := r.generateDDL()
-	if err != nil {
-		logrus.WithError(err).Errorln("ClickhouseRepository.generateDDL")
+	databaseName := r.cfg.Dumper.Repository.Name
+	if databaseName == "" {
+		databaseName = "default"
+	}
+	schema := r.cfg.Database.Filter.Schema
+
+	// 遍历表
+	for tblName, _ := range r.cfg.Database.Filter.Tables {
+		// generate DDL
+		ddl, err := r.generateDDL(databaseName, schema, tblName)
+		if err != nil {
+			logrus.WithError(err).Errorln("ClickhouseRepository.generateDDL")
+			return err
+		}
+
+		r.ch.Begin()
+		stmt, _ := r.ch.Prepare(ddl)
+		if _, err = stmt.Exec([]driver.Value{}); err != nil {
+			logrus.WithError(err).Errorln("ClickhouseRepository.stmt.Exec")
+			return err
+		}
+	}
+	if err := r.ch.Commit(); err != nil {
+		logrus.WithField("database", databaseName).WithError(err).Error("tables create error")
 		return err
 	}
-	// create table
-	r.ch.Begin()
-	stmt, _ := r.ch.Prepare(ddl)
-	if _, err = stmt.Exec([]driver.Value{}); err != nil {
-		logrus.WithError(err).Errorln("ClickhouseRepository.stmt.Exec")
-		return err
-	}
-	return r.ch.Commit()
+	logrus.WithField("database", databaseName).Info("tables is created")
+	return nil
 }
 
 func (r *ClickhouseRepository) InsertData(table string, json string) error {
@@ -246,5 +266,7 @@ func (r *ClickhouseRepository) InsertData(table string, json string) error {
 	return r.ch.Commit()
 }
 func (r *ClickhouseRepository) Close() error {
-	return r.ch.Close()
+	err := errors.Wrap(r.db.Close(), "database close()")
+	err = errors.Wrap(r.ch.Close(), "clickhouse close()")
+	return err
 }

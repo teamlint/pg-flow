@@ -12,8 +12,13 @@ PostgreSQL WAL Processor/Listener
 - clickhouse 需要配置 date_time_input_format='best_effort'
 
 ## TODO
-- clickhouse ddl
-- clickhouse 批量导入
-- dump/repository/repository.go 获取列信息 scheme参数动态获取
-- dump 运行完开始事件监听
-- ddl 引擎生成需要增加更多引擎判断
+
+### ClickHouse
+
+- [x] schema 过滤
+- [x] DDL 字段排序
+- [x] clickhouse ddl
+- [ ] DDl 自定义列设置
+- [ ] clickhouse 批量导入
+- [ ] dump 运行完开始事件监听
+- [ ] ddl 引擎生成需要增加更多引擎判断

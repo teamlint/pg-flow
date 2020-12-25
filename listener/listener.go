@@ -253,7 +253,7 @@ func (l *Listener) Stream(ctx context.Context) {
 					continue
 				}
 				if tx.CommitTime != nil {
-					events := tx.CreateEventsWithFilter(l.config.Database.Filter.Tables)
+					events := tx.CreateEventsWithFilter(l.config.Database.Filter.Schema, l.config.Database.Filter.Tables)
 					for _, event := range events {
 						subjectName := event.GetSubject(l.config.Publisher.TopicPrefix)
 						if err = l.publisher.Publish(subjectName, event); err != nil {

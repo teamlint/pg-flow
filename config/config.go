@@ -70,12 +70,12 @@ type DatabaseCfg struct {
 	Name     string `valid:"required"`
 	User     string `valid:"required"`
 	Password string `valid:"required"`
-	Schema   string
 	Filter   FilterStruct
 }
 
 // FilterStruct incoming WAL message filter.
 type FilterStruct struct {
+	Schema string
 	Tables map[string][]string
 }
 

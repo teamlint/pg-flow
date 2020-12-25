@@ -78,6 +78,16 @@ func PG2CHType(pgColumn database.Column) (string, error) {
 			return "", fmt.Errorf("length must be specified for character type")
 		}
 		chType = fmt.Sprintf("%s(%d)", chType, pgColumn.Ext[0])
+	case database.Timestamp, database.TimestampWithTimeZone, database.TimestampWithoutTimeZone:
+		if pgColumn.Ext != nil {
+			if pgColumn.Ext[0] > 0 {
+				chType = fmt.Sprintf("%s(%d)", chType, pgColumn.Ext[0]) // DateTime64
+			} else {
+				chType = DateTime // DateTime
+			}
+		} else {
+			chType = fmt.Sprintf("%s(%d)", chType, 6) // DateTime64(6)
+		}
 	}
 
 	if pgColumn.IsArray {

@@ -72,7 +72,7 @@ func (p *sqlParser) Parse(h handler.Handler) error {
 // parseSQL 解析 SQL 语句为事件
 func (p *sqlParser) parseEvent() *event.Event {
 	s := strings.ReplaceAll(p.buf.String(), `"`, "")
-	logrus.Debugf("parseEvent.statement[%v] = %v\n", p.buf.Len(), s)
+	// logrus.Debugf("parseEvent.statement[%v] = %v\n", p.buf.Len(), s)
 	stmt, err := sp.Parse(s)
 	if err != nil {
 		logrus.WithError(err).Warn("parseEvent")
