@@ -15,7 +15,9 @@ import (
 	"github.com/teamlint/pg-flow/dump/handler"
 	"github.com/teamlint/pg-flow/event"
 
-	sp "github.com/xwb1989/sqlparser"
+	// sp "github.com/xwb1989/sqlparser"
+	sp "github.com/cossacklabs/acra/sqlparser"
+	"github.com/cossacklabs/acra/sqlparser/dialect/postgresql"
 )
 
 const (
@@ -71,9 +73,11 @@ func (p *sqlParser) Parse(h handler.Handler) error {
 
 // parseSQL 解析 SQL 语句为事件
 func (p *sqlParser) parseEvent() *event.Event {
-	s := strings.ReplaceAll(p.buf.String(), `"`, "")
+	// s := strings.ReplaceAll(p.buf.String(), `"`, "")
 	// logrus.Debugf("parseEvent.statement[%v] = %v\n", p.buf.Len(), s)
-	stmt, err := sp.Parse(s)
+	s := p.buf.String()
+	stmt, err := sp.ParseWithDialect(postgresql.NewPostgreSQLDialect(), s)
+	// stmt, err := sp.Parse(s)
 	if err != nil {
 		logrus.WithError(err).Warn("parseEvent")
 		p.buf.Reset()
@@ -96,6 +100,10 @@ func (p *sqlParser) parseEvent() *event.Event {
 					data[name] = p.parseSQLVal(val)
 				case *sp.NullVal:
 					data[name] = nil
+				case sp.BoolVal:
+					data[name] = p.parseBoolVal(val)
+				default:
+					logrus.Warnf("parseEvent name[%v] %v(%v) is unsupport", name, col, val)
 				}
 			}
 			evt := event.Event{
@@ -165,6 +173,7 @@ func (p *sqlParser) statementAdd(line string) error {
 }
 
 func (p *sqlParser) parseSQLVal(val *sp.SQLVal) interface{} {
+	logrus.Debugf("parseSQLVal %v(%v)", string(val.Val), val.Type)
 	switch val.Type {
 	case sp.StrVal:
 		return string(val.Val)
@@ -185,4 +194,11 @@ func (p *sqlParser) parseSQLVal(val *sp.SQLVal) interface{} {
 
 	}
 	return string(val.Val)
+}
+
+func (p *sqlParser) parseBoolVal(val sp.BoolVal) interface{} {
+	if bool(val) {
+		return uint8(1)
+	}
+	return uint8(0)
 }

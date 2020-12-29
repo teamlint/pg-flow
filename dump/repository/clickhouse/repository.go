@@ -1,10 +1,13 @@
 package clickhouse
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go"
 	"github.com/jackc/pgx"
@@ -14,10 +17,25 @@ import (
 	"github.com/teamlint/pg-flow/database"
 )
 
+var (
+	// "2006-01-02 15:04:05",
+	TimestampRegexp = regexp.MustCompile(`\d+-\d+-\d+ \d+:\d+:\d+(,\d+)?`)
+	// SQL Timestamp
+	DBTimestamps = []string{"2006-01-02 15:04:05.999999-07",
+		"2006-01-02 15:04:05.999999",
+		"2006-01-02",
+	}
+)
+
+const (
+	DBNull = "NULL"
+)
+
 type ClickhouseRepository struct {
-	cfg *config.Config
-	db  database.Database
-	ch  clickhouse.Clickhouse
+	cfg  *config.Config
+	db   database.Database
+	ch   clickhouse.Clickhouse
+	chdb *sql.DB
 }
 
 // New
@@ -42,6 +60,24 @@ func New(cfg *config.Config) (*ClickhouseRepository, error) {
 		return nil, err
 	}
 	repo.ch = ch
+	// sql.DB
+	chdb, err := clickhouseDBConnect(cfg.Dumper.Repository)
+	if err != nil {
+		logrus.WithError(err).Errorln("ClickhouseRepository.clickhouseDBConnect")
+		return nil, err
+	}
+
+	if err := chdb.Ping(); err != nil {
+		if exception, ok := err.(*clickhouse.Exception); ok {
+			logrus.WithField("coce", exception.Code).WithField("stack", exception.StackTrace).Error(exception.Message)
+			return nil, err
+		} else {
+			logrus.WithError(err).Error("clickhouseRepository.clickhouseDBConnect.ping")
+			return nil, err
+		}
+	}
+	repo.chdb = chdb
+
 	return repo, nil
 }
 
@@ -70,6 +106,16 @@ func clickhouseConnect(cfg config.RepositoryCfg) (clickhouse.Clickhouse, error) 
 	conn, err := clickhouse.OpenDirect(connectionString(cfg))
 	if err != nil {
 		logrus.WithError(err).Error("clickhouse.clickhouseConnect")
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func clickhouseDBConnect(cfg config.RepositoryCfg) (*sql.DB, error) {
+	conn, err := sql.Open("clickhouse", connectionString(cfg))
+	if err != nil {
+		logrus.WithError(err).Error("clickhouse.clickhouseDBConnect")
 		return nil, err
 	}
 
@@ -242,7 +288,7 @@ func (r *ClickhouseRepository) CreateTables() error {
 		r.ch.Begin()
 		stmt, _ := r.ch.Prepare(ddl)
 		if _, err = stmt.Exec([]driver.Value{}); err != nil {
-			logrus.WithError(err).Errorln("ClickhouseRepository.stmt.Exec")
+			logrus.WithError(err).Errorln("ClickhouseRepository.CreateTables")
 			return err
 		}
 	}
@@ -254,13 +300,88 @@ func (r *ClickhouseRepository) CreateTables() error {
 	return nil
 }
 
-func (r *ClickhouseRepository) InsertData(table string, json string) error {
+func (r *ClickhouseRepository) SetInputFormat() error {
+	// input format setting
 	inputFormatSQL := "SET input_format_import_nested_json=1;"
-	insertSQL := fmt.Sprintf("INSERT INTO %s FORMAT JSONEachRow %s;", table, json)
 	r.ch.Begin()
-	stmt, _ := r.ch.Prepare(inputFormatSQL + insertSQL)
+	stmt, _ := r.ch.Prepare(inputFormatSQL)
 	if _, err := stmt.Exec([]driver.Value{}); err != nil {
-		logrus.WithError(err).Errorln("ClickhouseRepository.stmt.Exec")
+		logrus.WithError(err).Errorln("ClickhouseRepository.SetInputFormat")
+		return err
+	}
+	return r.ch.Commit()
+}
+func (r *ClickhouseRepository) InsertData(table string, data map[string]interface{}) error {
+	// insert data
+	// insertSQL := fmt.Sprintf("INSERT INTO %s FORMAT JSONEachRow %s;", table, json)
+	// sql.DB
+	// tx, err := r.chdb.Begin()
+	// if err != nil {
+	// 	logrus.WithError(err).Errorln("ClickhouseRepository.InsertData")
+	// 	return err
+	// }
+	// if _, err := tx.Exec(insertSQL); err != nil {
+	// 	logrus.WithError(err).Errorln("ClickhouseRepository.InsertData")
+	// 	return err
+	// }
+	// return tx.Commit()
+
+	// clickhouse.DB
+	var fields []string
+	var values []driver.Value
+	for k, v := range data {
+		// fields
+		fields = append(fields, k)
+		// values
+		// null
+		// if v == nil || v.(string) == DBNull {
+		logrus.Infof("%s(%T) field is %v", k, v, v)
+		if v == nil {
+			logrus.Infof("%s field is null", k)
+			v = nil
+		} else {
+			// datetime
+			switch t := v.(type) {
+			case string:
+				if found := TimestampRegexp.FindString(v.(string)); len(found) > 0 {
+					// v = fmt.Sprintf("parseDateTimeBestEffortOrNull('%s')", v)
+					logrus.Debugf("TimestampRegexp found=%v", found)
+					t, err := parseTimestamp(v.(string))
+					if err != nil {
+						return err
+					}
+					v = t
+				}
+			default:
+				v = t
+			}
+		}
+		values = append(values, v)
+	}
+	// insert statement
+	var sb strings.Builder
+	sb.WriteString("INSERT INTO ")
+	sb.WriteString(table)
+	sb.WriteString(" (")
+	sb.WriteString(strings.Join(fields, ", "))
+	sb.WriteString(")")
+	sb.WriteString(" VALUES (")
+	l := len(fields)
+	for i := range fields {
+		if i == l-1 {
+			sb.WriteString("?")
+		} else {
+			sb.WriteString("?, ")
+		}
+	}
+	sb.WriteString(")")
+
+	r.ch.Begin()
+	stmt, _ := r.ch.Prepare(sb.String())
+	logrus.Debugf("Insert SQL=%s", sb.String())
+	// TODO 批处理插入数据
+	if _, err := stmt.Exec(values); err != nil {
+		logrus.WithError(err).Errorln("ClickhouseRepository.InsertData")
 		return err
 	}
 	return r.ch.Commit()
@@ -269,4 +390,15 @@ func (r *ClickhouseRepository) Close() error {
 	err := errors.Wrap(r.db.Close(), "database close()")
 	err = errors.Wrap(r.ch.Close(), "clickhouse close()")
 	return err
+}
+func parseTimestamp(s string) (time.Time, error) {
+	var t time.Time
+	var err error
+	for _, layout := range DBTimestamps {
+		t, err = time.Parse(layout, s)
+		if err == nil {
+			break
+		}
+	}
+	return t, err
 }

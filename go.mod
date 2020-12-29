@@ -7,6 +7,7 @@ require (
 	github.com/ClickHouse/clickhouse-go v1.4.3
 	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef
 	github.com/cockroachdb/apd v1.1.0 // indirect
+	github.com/cossacklabs/acra v0.0.0-20201223151513-e306dc2f5bcb
 	github.com/elastic/go-elasticsearch/v7 v7.10.0
 	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/google/uuid v1.1.2
@@ -25,6 +26,5 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/teamlint/shard v0.1.0
 	github.com/urfave/cli/v2 v2.3.0
-	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	google.golang.org/protobuf v1.25.0 // indirect
 )

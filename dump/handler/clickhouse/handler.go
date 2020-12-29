@@ -1,9 +1,6 @@
 package clickhouse
 
 import (
-	"bytes"
-	"encoding/json"
-
 	"github.com/jackc/pgx"
 	"github.com/sirupsen/logrus"
 	"github.com/teamlint/pg-flow/config"
@@ -25,6 +22,7 @@ const (
 type ClickhouseHandler struct {
 	writer *shard.Writer
 	conn   *pgx.Conn
+	ch     *chrepo.ClickhouseRepository
 }
 
 func New(fileSize uint32) handler.Handler {
@@ -53,7 +51,13 @@ func (h *ClickhouseHandler) Init(cfg *config.Config) error {
 		logrus.WithError(err).Errorln("handler.Init")
 		return err
 	}
-	defer ch.Close()
+	h.ch = ch
+	// set input format
+	err = h.ch.SetInputFormat()
+	if err != nil {
+		logrus.WithError(err).Errorln("handler.Init clickhouse.SetInputFormat")
+		return err
+	}
 	return ch.CreateTables()
 }
 
@@ -61,6 +65,7 @@ func (h *ClickhouseHandler) Handle(evt *event.Event) error {
 	// event over
 	if evt.IsOver() {
 		h.writer.Close()
+		h.ch.Close()
 		logrus.Infoln("clickhouse.handler event is over")
 		return nil
 	}
@@ -69,27 +74,29 @@ func (h *ClickhouseHandler) Handle(evt *event.Event) error {
 		WithField("action", evt.Action).
 		Debugln("[event]")
 
-	var buf bytes.Buffer
-	dataBytes, err := json.Marshal(evt.Data)
-	// evtData, err := evt.MarshalJSON()
-	if err != nil {
-		logrus.WithError(err).Error("clickhouse.handler json.Marshal")
-		return nil
-	}
+	// var buf bytes.Buffer
+	// dataBytes, err := json.Marshal(evt.Data)
+	// // evtData, err := evt.MarshalJSON()
+	// if err != nil {
+	// 	logrus.WithError(err).Error("clickhouse.handler json.Marshal")
+	// 	return nil
+	// }
 	// TODO 针对不同表处理
 
 	// data := gjson.GetBytes(evtData, "data").Raw
-	dataBytes = append(dataBytes, "\n"...)
-	buf.Grow(len(dataBytes))
-	buf.Write(dataBytes)
+	// dataBytes = append(dataBytes, "\n"...)
+	// buf.Grow(len(dataBytes))
+	// buf.Write(dataBytes)
 	// logrus.WithField("dumper.handler", "clickhouse").Debugln(buf.String())
-	h.writer.Write(buf.Bytes())
+	// h.writer.Write(buf.Bytes())
 
 	// logrus.WithField("dumper.handler", "clickhouse").Debugln(string(dataBytes))
 	// logrus.WithField("dumper.handler", "clickhouse").Debugln(data)
 	// h.writer.WriteString(data + "\n")
-	h.writer.Write(dataBytes)
-	// TODO 实现 clickhouse 数据导入
+	// h.writer.Write(dataBytes)
 
-	return h.writer.Err()
+	// TODO 实现 clickhouse 数据导入
+	return h.ch.InsertData(evt.Table, evt.Data)
+
+	// return h.writer.Err()
 }
