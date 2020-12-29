@@ -173,7 +173,7 @@ func (p *sqlParser) statementAdd(line string) error {
 }
 
 func (p *sqlParser) parseSQLVal(val *sp.SQLVal) interface{} {
-	logrus.Debugf("parseSQLVal %v(%v)", string(val.Val), val.Type)
+	// logrus.Debugf("parseSQLVal %v(%v)", string(val.Val), val.Type)
 	switch val.Type {
 	case sp.StrVal:
 		return string(val.Val)

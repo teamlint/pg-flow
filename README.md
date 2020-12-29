@@ -9,7 +9,7 @@ PostgreSQL WAL Processor/Listener
 
 
 ## 注意事项
-- clickhouse 需要配置 date_time_input_format='best_effort'
+- ~~clickhouse 需要配置 date_time_input_format='best_effort'~~
 
 ## TODO
 

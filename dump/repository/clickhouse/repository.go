@@ -335,9 +335,8 @@ func (r *ClickhouseRepository) InsertData(table string, data map[string]interfac
 		// values
 		// null
 		// if v == nil || v.(string) == DBNull {
-		logrus.Infof("%s(%T) field is %v", k, v, v)
+		logrus.Debugf("%s(%T) field is %v", k, v, v)
 		if v == nil {
-			logrus.Infof("%s field is null", k)
 			v = nil
 		} else {
 			// datetime
@@ -348,7 +347,7 @@ func (r *ClickhouseRepository) InsertData(table string, data map[string]interfac
 					logrus.Debugf("TimestampRegexp found=%v", found)
 					t, err := parseTimestamp(v.(string))
 					if err != nil {
-						return err
+						logrus.WithError(err).Error("timestamp parse")
 					}
 					v = t
 				}
@@ -378,7 +377,6 @@ func (r *ClickhouseRepository) InsertData(table string, data map[string]interfac
 
 	r.ch.Begin()
 	stmt, _ := r.ch.Prepare(sb.String())
-	logrus.Debugf("Insert SQL=%s", sb.String())
 	// TODO 批处理插入数据
 	if _, err := stmt.Exec(values); err != nil {
 		logrus.WithError(err).Errorln("ClickhouseRepository.InsertData")
@@ -399,6 +397,9 @@ func parseTimestamp(s string) (time.Time, error) {
 		if err == nil {
 			break
 		}
+	}
+	if err != nil {
+		return time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC), err
 	}
 	return t, err
 }
